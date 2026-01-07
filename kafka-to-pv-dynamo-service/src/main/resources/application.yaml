@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: kafka-to-pv-dynamo-service
   profiles:
     active: dev
     #active: ${SPRING_PROFILES_ACTIVE}

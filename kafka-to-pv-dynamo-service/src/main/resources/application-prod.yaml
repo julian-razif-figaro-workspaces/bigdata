@@ -1,0 +1,42 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+kafka-consumer-config:
+  bootstrap-servers: ${KAFKA-CONSUMER-CONFIG_BOOTSTRAP-SERVERS}
+  client-id: ${KAFKA-CONSUMER-CONFIG_CLIENT-ID}
+  group-id: ${KAFKA-CONSUMER-CONFIG_GROUP-ID}
+  key-deserializer: ${KAFKA-CONSUMER-CONFIG_KEY-DESERIALIZER}
+  value-deserializer: ${KAFKA-CONSUMER-CONFIG_VALUE-DESERIALIZER}
+  enable-auto-commit: ${KAFKA-CONSUMER-CONFIG_ENABLE-AUTO-COMMIT}
+  auto-offset-reset: ${KAFKA-CONSUMER-CONFIG_AUTO-OFFSET-RESET}
+  batch-listener: ${KAFKA-CONSUMER-CONFIG_BATCH-LISTENER}
+  auto-startup: ${KAFKA-CONSUMER-CONFIG_AUTO-STARTUP}
+  concurrency-level: ${KAFKA-CONSUMER-CONFIG_CONCURRENCY-LEVEL}
+  session-timeout-ms: ${KAFKA-CONSUMER-CONFIG_SESSION-TIMEOUT-MS}
+  heartbeat-interval-ms: ${KAFKA-CONSUMER-CONFIG_HEARTBEAT-INTERVAL-MS}
+  max-poll-interval-ms: ${KAFKA-CONSUMER-CONFIG_MAX-POLL-INTERVAL-MS}
+  max-poll-records: ${KAFKA-CONSUMER-CONFIG_MAX-POLL-RECORDS}
+  max-partition-fetch-bytes-default: ${KAFKA-CONSUMER-CONFIG_MAX-PARTITION-FETCH-BYTES-DEFAULT}
+  max-partition-fetch-bytes-boost-factor: ${KAFKA-CONSUMER-CONFIG_MAX-PARTITION-FETCH-BYTES-BOOSTS-FACTOR}
+  poll-timeout-ms: ${KAFKA-CONSUMER-CONFIG_POLL-TIMEOUT-MS}
+  num-of-partitions: ${KAFKA-CONSUMER-CONFIG_NUM-OF-PARTITIONS}
+  replication-factor: ${KAFKA-CONSUMER-CONFIG_REPLICATION-FACTOR}
+  redis-temp-data-topic: ${KAFKA-CONSUMER-CONFIG_REDIS-TEMP-DATA-TOPIC}
+dynamo-config-data:
+  dynamodb-endpoint: ${DYNAMO-CONFIG-DATA_DYNAMODB-ENDPOINT}
+  aws-region: ${DYNAMO-CONFIG-DATA_AWS-REGION}
+  aws-accesskey: ${DYNAMO-CONFIG-DATA_AWS-ACCESSKEY}
+  aws-secretkey: ${DYNAMO-CONFIG-DATA_AWS-SECRETKEY}
+  table-name-session-provider-member: ${DYNAMO-CONFIG-DATA_TABLE-NAME-SESSION-PROVIDER-MEMBER}
+  act-session-user-pv: ${DYNAMO-CONFIG-DATA_ACT-SESSION-USER-PV}
+  connectionTTL: ${DYNAMO-CONFIG-DATA_CONNECTION-TTL}
+  connection-timeout: ${DYNAMO-CONFIG-DATA_CONNECTION-TIMEOUT}
+  client-execution-timeout: ${DYNAMO-CONFIG-DATA_CLIENT-EXECUTION-TIMEOUT}
+  request-timeout: ${DYNAMO-CONFIG-DATA_REQUEST-TIMEOUT}
+  socket-timeout: ${DYNAMO-CONFIG-DATA_SOCKET-TIMEOUT}
+  max-retry: ${DYNAMO-CONFIG-DATA_MAX-RETRY}
+  throttled-retries: ${DYNAMO-CONFIG-DATA_THROTTLED-RETRIES}
+  connection-max-idle-millis: ${DYNAMO-CONFIG-DATA_CONNECTION-MAX-IDLE-MILLIS}
+  max-connections: ${DYNAMO-CONFIG-DATA_MAX-CONNECTIONES}
+  tcp-keep-alive: ${DYNAMO-CONFIG-DATA_TCP-KEEP-ALIVE}

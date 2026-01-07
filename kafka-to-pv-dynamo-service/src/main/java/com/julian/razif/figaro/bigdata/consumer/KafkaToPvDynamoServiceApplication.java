@@ -8,7 +8,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan({"com.julian.razif.figaro.bigdata.appconfig"})
 public class KafkaToPvDynamoServiceApplication {
 
-  static void main(String[] args) {
+  private KafkaToPvDynamoServiceApplication() {
+  }
+
+  public static void main(String[] args) {
     SpringApplication.run(KafkaToPvDynamoServiceApplication.class, args);
   }
 

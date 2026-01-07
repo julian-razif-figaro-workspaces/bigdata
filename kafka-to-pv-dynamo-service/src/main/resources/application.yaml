@@ -31,3 +31,20 @@ kafka-consumer-config:
   num-of-partitions: 42
   replication-factor: 3
   redis-temp-data-topic: RedisTempBigDataSession
+dynamo-config-data:
+  dynamodb-endpoint: dynamodb.ap-southeast-1.amazonaws.com
+  aws-region: ap-southeast-1
+  aws-accesskey: ${DYNAMO-CONFIG-DATA_AWS-ACCESSKEY}
+  aws-secretkey: ${DYNAMO-CONFIG-DATA_AWS-SECRETKEY}
+  table-name-session-provider-member: BigDataSession_ProviderMember
+  act-session-user-pv: bigDataSesUsPvMember
+  connectionTTL: 20000
+  connection-timeout: 4000
+  client-execution-timeout: 10000
+  request-timeout: 2000
+  socket-timeout: 1800
+  max-retry: 100
+  throttled-retries: true
+  connection-max-idle-millis: 1000
+  max-connections: 2000
+  tcp-keep-alive: false

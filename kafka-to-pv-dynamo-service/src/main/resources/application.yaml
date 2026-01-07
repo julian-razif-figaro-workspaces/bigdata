@@ -1,0 +1,33 @@
+spring:
+  profiles:
+    active: dev
+    #active: ${SPRING_PROFILES_ACTIVE}
+
+---
+spring:
+  application:
+    name: kafka-to-pv-dynamo-service
+  config:
+    activate:
+      on-profile: dev
+kafka-consumer-config:
+  bootstrap-servers: 192.168.1.8:9092,192.168.1.9:9092,192.168.1.10:9092
+  client-id: BO_JULIAN_DEV_PV_02
+  group-id: BO_02_JULIAN_DEV_PV
+  key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+  enable-auto-commit: false
+  auto-offset-reset: latest
+  batch-listener: true
+  auto-startup: true
+  concurrency-level: 3
+  session-timeout-ms: 10000
+  heartbeat-interval-ms: 3000
+  max-poll-interval-ms: 300000
+  max-poll-records: 500
+  max-partition-fetch-bytes-default: 1048576
+  max-partition-fetch-bytes-boost-factor: 1
+  poll-timeout-ms: 150
+  num-of-partitions: 42
+  replication-factor: 3
+  redis-temp-data-topic: RedisTempBigDataSession

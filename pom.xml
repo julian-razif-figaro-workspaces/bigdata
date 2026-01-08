@@ -14,7 +14,8 @@
 	<modules>
 		<module>app-config-data</module>
 		<module>kafka-to-pv-dynamo-service</module>
-	</modules>
+        <module>dynamo-config</module>
+    </modules>
 
 	<groupId>com.julian.razif.figaro</groupId>
 	<artifactId>bigdata</artifactId>
@@ -45,13 +46,27 @@
 		<sonar-maven-plugin.version>5.1.0.4751</sonar-maven-plugin.version>
 		<jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
 		<maven.compiler.plugin.version>3.14.1</maven.compiler.plugin.version>
+
+		<awsjavasdk.version>2.41.0</awsjavasdk.version>
 	</properties>
+
+	<repositories>
+		<repository>
+			<id>central</id>
+			<url>https://repo.maven.apache.org/maven2</url>
+		</repository>
+	</repositories>
 
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
 				<groupId>com.julian.razif.figaro</groupId>
 				<artifactId>app-config-data</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.julian.razif.figaro</groupId>
+				<artifactId>dynamo-config</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
@@ -64,6 +79,14 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-dependencies</artifactId>
 				<version>${spring-boot.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${awsjavasdk.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>

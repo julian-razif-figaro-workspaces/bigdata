@@ -13,8 +13,9 @@
 
 	<modules>
 		<module>app-config-data</module>
-		<module>kafka-to-pv-dynamo-service</module>
         <module>dynamo-config</module>
+        <module>kafka-consumer-config</module>
+		<module>kafka-to-pv-dynamo-service</module>
     </modules>
 
 	<groupId>com.julian.razif.figaro</groupId>
@@ -67,6 +68,11 @@
 			<dependency>
 				<groupId>com.julian.razif.figaro</groupId>
 				<artifactId>dynamo-config</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.julian.razif.figaro</groupId>
+				<artifactId>kafka-consumer-config</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>

@@ -3,20 +3,24 @@ package com.julian.razif.figaro.bigdata.consumer;
 import com.google.gson.*;
 import com.julian.razif.figaro.bigdata.consumer.config.KafkaConsumer;
 import com.julian.razif.figaro.bigdata.consumer.service.DynamoDBService;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Kafka consumer for processing session data and persisting to DynamoDB.
@@ -52,6 +56,36 @@ import java.util.concurrent.CompletionException;
 public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
 
   private static final Logger logger = LoggerFactory.getLogger(KafkaToPvDynamoConsumer.class);
+
+  /**
+   * Maximum allowed JSON message size in bytes (1MB).
+   */
+  private static final int MAX_JSON_SIZE = 1_048_576;
+
+  /**
+   * Maximum allowed JSON depth to prevent deeply nested attacks.
+   */
+  private static final int MAX_JSON_DEPTH = 10;
+
+  /**
+   * Action type constant for big data session provider member.
+   */
+  private static final String ACTION_BIG_DATA_SESSION = "bigDataSesUsPvMember";
+
+  /**
+   * Required JSON field names.
+   */
+  private static final String FIELD_ACT = "act";
+  private static final String FIELD_DATA = "data";
+  private static final String FIELD_ID = "id";
+  private static final String FIELD_USER_ID = "user_id";
+  private static final String FIELD_MEMBER_USERNAME = "member_username";
+  private static final String FIELD_DATE = "date";
+
+  /**
+   * Thread-safe date formatter for date formatting.
+   */
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneId.systemDefault());
 
   /**
    * Gson instance configured with date format for JSON parsing.
@@ -105,28 +139,50 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
   public void receive(
     @Payload List<String> messages) {
 
-    Flux.<JsonObject>create(sink -> CompletableFuture.supplyAsync(() -> messages.parallelStream().map(message -> filter(message).join()).toList()
-      ).whenCompleteAsync((dtos, throwable) -> {
-        if (throwable != null) {
-          sink.complete();
-        } else {
-          dtos.forEach(sink::next);
+    AtomicInteger processedCount = new AtomicInteger(0);
+    AtomicInteger errorCount = new AtomicInteger(0);
+
+    logger.info("Received batch of {} messages for processing", messages.size());
+
+    Flux
+      .fromIterable(messages)
+      .flatMap(message -> Mono.fromFuture(filter(message)), 10) // Process 10 messages concurrently
+      .filter(json -> !json.isJsonNull() && json.has(FIELD_DATA))
+      .flatMap(json -> {
+        try {
+          JsonObject data = json.get(FIELD_DATA).getAsJsonObject();
+          long dateMillis = data.get(FIELD_DATE).getAsLong();
+          String dateString = DATE_FORMATTER.format(Instant.ofEpochMilli(dateMillis));
+          String sessionId = data.get(FIELD_ID).getAsString();
+          String userId = data.get(FIELD_USER_ID).getAsString();
+          String memberUsername = data.get(FIELD_MEMBER_USERNAME).getAsString();
+
+          logger.debug("Processing session: id={}, userId={}, username={}", sessionId, userId, memberUsername);
+
+          return Mono
+            .fromFuture(dynamoDBService.saveSessionAsync(dateString, sessionId, userId, memberUsername))
+            .map(success -> {
+              if (Boolean.TRUE.equals(success)) {
+                processedCount.incrementAndGet();
+              } else {
+                errorCount.incrementAndGet();
+                logger.warn("Failed to save session: id={}", sessionId);
+              }
+              return success;
+            });
+        } catch (Exception e) {
+          errorCount.incrementAndGet();
+          logger.error("Error extracting session data from JSON", e);
+          return Mono.just(false);
         }
       })
-    ).subscribeOn(Schedulers.boundedElastic()).subscribe(json -> {
-      Date date = new Date(json.get("data").getAsJsonObject().get("date").getAsLong());
-      SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-      String dateString = sdf.format(date);
-      String sessionId = json.get("data").getAsJsonObject().get("id").getAsString();
-      String userId = json.get("data").getAsJsonObject().get("user_id").getAsString();
-      String memberUsername = json.get("data").getAsJsonObject().get("member_username").getAsString();
-      logger.info("date={}", dateString);
-      logger.info("sessionId={}", sessionId);
-      logger.info("userId={}", userId);
-      logger.info("memberUsername={}", memberUsername);
-
-      dynamoDBService.saveSessionAsync(dateString, sessionId, userId, memberUsername).join();
-    });
+      .doOnError(error -> {
+        errorCount.incrementAndGet();
+        logger.error("Error processing message batch", error);
+      })
+      .doOnComplete(() -> logger.info("Batch processing completed: processed={}, errors={}, total={}", processedCount.get(), errorCount.get(), messages.size()))
+      .subscribeOn(Schedulers.boundedElastic())
+      .subscribe();
   }
 
   /**
@@ -154,46 +210,113 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
    * or an empty {@link JsonObject} if validation fails
    * @throws CompletionException if JSON parsing fails or the message structure is invalid
    */
-  public CompletableFuture<JsonObject> filter(String message) {
-    return CompletableFuture.supplyAsync(() -> {
-      JsonObject objectMessage;
-      try {
-        objectMessage = gson.fromJson(message, JsonElement.class).getAsJsonObject();
-      } catch (JsonSyntaxException ex) {
-        throw new CompletionException("not valid JSON", ex);
-      }
+  public CompletableFuture<JsonObject> filter(
+    String message) {
 
-      if (!objectMessage.isJsonNull()
-        && objectMessage.has("act")
-        && Objects.equals(objectMessage.get("act").getAsString(), "bigDataSesUsPvMember")
-        && objectMessage.has("data")
-        && !objectMessage.get("data").isJsonNull()) {
+    return CompletableFuture
+      .supplyAsync(() -> {
 
-        JsonObject data = objectMessage.get("data").getAsJsonObject();
+        JsonObject x = getJsonObject(message);
+        if (x != null) return x;
 
-        logger.debug("from kafka={}", objectMessage);
+        JsonObject objectMessage;
+        try {
+          objectMessage = gson.fromJson(message, JsonElement.class).getAsJsonObject();
 
-        if (data.isJsonNull()
-          || !data.has("id")
-          || !data.has("user_id")
-          || !data.has("member_username")) {
-
-          throw new CompletionException(new JsonSyntaxException("not valid JSON"));
+          // Validate JSON depth to prevent deeply nested attacks
+          if (getJsonDepth(objectMessage) > MAX_JSON_DEPTH) {
+            logger.warn("JSON depth exceeds maximum allowed depth {}, rejecting", MAX_JSON_DEPTH);
+            return new JsonObject();
+          }
+        } catch (JsonSyntaxException ex) {
+          logger.debug("Invalid JSON syntax, skipping message", ex);
+          return new JsonObject();
         }
 
-        long currentDateMilliseconds = System.currentTimeMillis();
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        Date currentDate = new Date(currentDateMilliseconds);
+        if (!objectMessage.isJsonNull()
+          && objectMessage.has(FIELD_ACT)
+          && Objects.equals(objectMessage.get(FIELD_ACT).getAsString(), ACTION_BIG_DATA_SESSION)
+          && objectMessage.has(FIELD_DATA)
+          && !objectMessage.get(FIELD_DATA).isJsonNull()) {
 
-        data.addProperty("date", sdf.format(currentDate));
+          JsonObject data = objectMessage.get(FIELD_DATA).getAsJsonObject();
 
-        logger.debug("jsonObject={}", data);
+          logger.debug("Received valid message from Kafka: action={}", ACTION_BIG_DATA_SESSION);
 
-        return objectMessage;
-      } else {
-        return new JsonObject();
+          if (data.isJsonNull()
+            || !data.has(FIELD_ID)
+            || !data.has(FIELD_USER_ID)
+            || !data.has(FIELD_MEMBER_USERNAME)) {
+
+            logger.debug("Message missing required fields, skipping");
+            return new JsonObject();
+          }
+
+          // Use thread-safe DateTimeFormatter instead of SimpleDateFormat
+          long currentDateMilliseconds = System.currentTimeMillis();
+          data.addProperty(FIELD_DATE, currentDateMilliseconds);
+
+          logger.debug("Filtered and validated message successfully");
+
+          return objectMessage;
+        } else {
+          return new JsonObject();
+        }
+      });
+  }
+
+  @Nullable
+  private static JsonObject getJsonObject(
+    String message) {
+
+    // Validate message size to prevent memory exhaustion attacks
+    if (message == null || message.isEmpty()) {
+      logger.debug("Received null or empty message, skipping");
+      return new JsonObject();
+    }
+
+    if (message.length() > MAX_JSON_SIZE) {
+      logger.warn("Message size {} exceeds maximum allowed size {}, rejecting", message.length(), MAX_JSON_SIZE);
+      return new JsonObject();
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculates the depth of a JSON object to prevent deeply nested attacks.
+   * <p>
+   * This method recursively traverses the JSON structure and returns the maximum
+   * depth found. Objects and arrays contribute to depth, while primitive values do not.
+   * </p>
+   *
+   * @param element the JSON element to measure
+   * @return the maximum depth of the JSON structure
+   */
+  private int getJsonDepth(
+    JsonElement element) {
+
+    if (element == null || element.isJsonNull() || element.isJsonPrimitive()) {
+      return 1;
+    }
+
+    if (element.isJsonArray()) {
+      int maxDepth = 1;
+      for (JsonElement child : element.getAsJsonArray()) {
+        maxDepth = Math.max(maxDepth, getJsonDepth(child));
       }
-    });
+      return 1 + maxDepth;
+    }
+
+    if (element.isJsonObject()) {
+      int maxDepth = 1;
+      for (var entry : element.getAsJsonObject().entrySet()) {
+        maxDepth = Math.max(maxDepth, getJsonDepth(entry.getValue()));
+      }
+      return 1 + maxDepth;
+    }
+
+    return 1;
   }
 
 }

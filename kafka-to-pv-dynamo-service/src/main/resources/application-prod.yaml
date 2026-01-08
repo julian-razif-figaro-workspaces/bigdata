@@ -2,6 +2,8 @@ spring:
   config:
     activate:
       on-profile: prod
+
+# Kafka Config
 kafka-consumer-config:
   bootstrap-servers: ${KAFKA-CONSUMER-CONFIG_BOOTSTRAP-SERVERS}
   client-id: ${KAFKA-CONSUMER-CONFIG_CLIENT-ID}
@@ -23,13 +25,27 @@ kafka-consumer-config:
   num-of-partitions: ${KAFKA-CONSUMER-CONFIG_NUM-OF-PARTITIONS}
   replication-factor: ${KAFKA-CONSUMER-CONFIG_REPLICATION-FACTOR}
   redis-temp-data-topic: ${KAFKA-CONSUMER-CONFIG_REDIS-TEMP-DATA-TOPIC}
+
+# Dynamo Config
 dynamo-config-data:
+
+  # AWS Config
   dynamodb-endpoint: ${DYNAMO-CONFIG-DATA_DYNAMODB-ENDPOINT}
   aws-region: ${DYNAMO-CONFIG-DATA_AWS-REGION}
   aws-accesskey: ${DYNAMO-CONFIG-DATA_AWS-ACCESSKEY}
   aws-secretkey: ${DYNAMO-CONFIG-DATA_AWS-SECRETKEY}
+
+  # Table names
   table-name-session-provider-member: ${DYNAMO-CONFIG-DATA_TABLE-NAME-SESSION-PROVIDER-MEMBER}
+  table-name-session-user: ${DYNAMO-CONFIG-DATA_TABLE-NAME-SESSION-USER}
+  table-name-persistence-provider-member: ${DYNAMO-CONFIG-DATA_TABLE-NAME-PERSISTENCE-PROVIDER-MEMBER}
+  table-name-persistence-user: ${DYNAMO-CONFIG-DATA_TABLE-NAME-PERSISTENCE-USER}
+
+  # Session activity names
   act-session-user-pv: ${DYNAMO-CONFIG-DATA_ACT-SESSION-USER-PV}
+  act-session-user: ${DYNAMO-CONFIG-DATA_ACT-SESSION-USER}
+
+  # Connection settings
   connectionTTL: ${DYNAMO-CONFIG-DATA_CONNECTION-TTL}
   connection-timeout: ${DYNAMO-CONFIG-DATA_CONNECTION-TIMEOUT}
   client-execution-timeout: ${DYNAMO-CONFIG-DATA_CLIENT-EXECUTION-TIMEOUT}

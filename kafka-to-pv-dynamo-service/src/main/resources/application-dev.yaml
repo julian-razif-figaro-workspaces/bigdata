@@ -2,6 +2,8 @@ spring:
   config:
     activate:
       on-profile: dev
+
+# Kafka Config
 kafka-consumer-config:
   bootstrap-servers: 192.168.1.8:9092,192.168.1.9:9092,192.168.1.10:9092
   client-id: BO_JULIAN_DEV_PV_02
@@ -23,13 +25,27 @@ kafka-consumer-config:
   num-of-partitions: 42
   replication-factor: 3
   redis-temp-data-topic: RedisTempBigDataSession
+
+# Dynamo Config
 dynamo-config-data:
+
+  # AWS Config
   dynamodb-endpoint: dynamodb.ap-southeast-1.amazonaws.com
   aws-region: ap-southeast-1
   aws-accesskey: ${DYNAMO-CONFIG-DATA_AWS-ACCESSKEY}
   aws-secretkey: ${DYNAMO-CONFIG-DATA_AWS-SECRETKEY}
+
+  # Table names
   table-name-session-provider-member: BigDataSession_ProviderMember
+  table-name-session-user: BigDataSession_User
+  table-name-persistence-provider-member: BigDataPersistence_ProviderMember
+  table-name-persistence-user: BigDataPersistence_User
+
+  # Session activity names
   act-session-user-pv: bigDataSesUsPvMember
+  act-session-user: bigDataSesUser
+
+  # Connection settings
   connectionTTL: 20000
   connection-timeout: 4000
   client-execution-timeout: 10000

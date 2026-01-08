@@ -48,7 +48,8 @@ public class DynamoDBService {
    * @param configData          DynamoDB configuration properties including table names and timeouts
    */
   public DynamoDBService(
-    DynamoDbAsyncClient dynamoDbAsyncClient, DynamonDBConfigData configData) {
+    DynamoDbAsyncClient dynamoDbAsyncClient,
+    DynamonDBConfigData configData) {
 
     this.dynamoDbAsyncClient = dynamoDbAsyncClient;
     this.configData = configData;
@@ -62,20 +63,32 @@ public class DynamoDBService {
    * {@link CompletableFuture} that completes when the write operation finishes.
    * </p>
    * <p>
+   * <strong>Input Validation:</strong>
+   * All parameters are validated for null values, proper format, and length constraints
+   * to prevent invalid data from being persisted.
+   * </p>
+   * <p>
    * <strong>Error Handling:</strong>
    * If the write operation fails, the error is logged and the future completes with
    * {@code false}. Callers should check the returned boolean to verify success.
    * </p>
    *
-   * @param date           session date in {@code yyyy-MM-dd} format
-   * @param id             unique session identifier
-   * @param userId         user identifier associated with the session
-   * @param memberUsername username of the member in the session
+   * @param date           session date in {@code yyyy-MM-dd} format (required, not null)
+   * @param id             unique session identifier (required, numeric string)
+   * @param userId         user identifier associated with the session (required, numeric string)
+   * @param memberUsername username of the member in the session (required, max 255 chars)
    * @return a {@link CompletableFuture} that completes with {@code true} if the save was successful,
    * {@code false} otherwise
+   * @throws IllegalArgumentException if any parameter is null, empty, or invalid
    */
   public CompletableFuture<Boolean> saveSessionAsync(
-    String date, String id, String userId, String memberUsername) {
+    String date,
+    String id,
+    String userId,
+    String memberUsername) {
+
+    // Validate all inputs
+    validateSessionParameters(date, id, userId, memberUsername);
 
     Map<String, AttributeValue> item = new HashMap<>();
     item.put("date", AttributeValue.builder().s(date).build());
@@ -86,12 +99,95 @@ public class DynamoDBService {
     PutItemRequest request = PutItemRequest.builder().tableName(configData.tableNameSessionProviderMember()).item(item).build();
 
     return dynamoDbAsyncClient.putItem(request).thenApply(response -> {
-      logger.info("Session saved asynchronously: id={}, userId={}, memberUsername={},  httpStatus={}", id, userId, memberUsername, response.sdkHttpResponse().statusCode());
-      return response.sdkHttpResponse().isSuccessful();
+      int statusCode = response.sdkHttpResponse().statusCode();
+      boolean isSuccessful = response.sdkHttpResponse().isSuccessful();
+
+      if (isSuccessful) {
+        logger.info("Session saved successfully: id={}, userId={}, status={}", id, userId, statusCode);
+      } else {
+        logger.error("Session save returned non-success status: id={}, userId={}, status={}", id, userId, statusCode);
+      }
+
+      return isSuccessful;
     }).exceptionally(throwable -> {
-      logger.error("Failed to save session asynchronously: id={}, userId={}, memberUsername={}", id, userId, memberUsername, throwable);
+      logger.error("Failed to save session to DynamoDB: id={}, userId={}, username={}, error={}", id, userId, memberUsername, throwable.getMessage(), throwable);
       return false;
     });
+  }
+
+  /**
+   * Validates session parameters before saving to DynamoDB.
+   * <p>
+   * Performs comprehensive validation including null checks, format validation,
+   * and length constraints to ensure data integrity.
+   * </p>
+   *
+   * @param date           session date in {@code yyyy-MM-dd} format
+   * @param id             unique session identifier (must be numeric)
+   * @param userId         user identifier (must be numeric)
+   * @param memberUsername username of the member (max 255 characters)
+   * @throws IllegalArgumentException if any parameter fails validation
+   */
+  private void validateSessionParameters(
+    String date,
+    String id,
+    String userId,
+    String memberUsername) {
+
+    // Null checks
+    if (date == null || date.isEmpty()) {
+      throw new IllegalArgumentException("date must not be null or empty");
+    }
+    if (id == null || id.isEmpty()) {
+      throw new IllegalArgumentException("id must not be null or empty");
+    }
+    if (userId == null || userId.isEmpty()) {
+      throw new IllegalArgumentException("userId must not be null or empty");
+    }
+    if (memberUsername == null || memberUsername.isEmpty()) {
+      throw new IllegalArgumentException("memberUsername must not be null or empty");
+    }
+
+    // Validate date format (yyyy-MM-dd)
+    if (!date.matches("^\\d{4}-\\d{2}-\\d{2}$")) {
+      throw new IllegalArgumentException(
+        String.format("date must be in yyyy-MM-dd format, got: %s", date)
+      );
+    }
+
+    // Validate numeric fields
+    if (!id.matches("^\\d+$")) {
+      throw new IllegalArgumentException(
+        String.format("id must contain only digits, got: %s", id)
+      );
+    }
+    if (!userId.matches("^\\d+$")) {
+      throw new IllegalArgumentException(
+        String.format("userId must contain only digits, got: %s", userId)
+      );
+    }
+
+    // Validate string length constraints
+    if (memberUsername.length() > 255) {
+      throw new IllegalArgumentException(
+        String.format("memberUsername exceeds maximum length of 255 characters: %d", memberUsername.length())
+      );
+    }
+
+    // Validate reasonable bounds for IDs
+    try {
+      long idValue = Long.parseLong(id);
+      if (idValue <= 0) {
+        throw new IllegalArgumentException("id must be a positive number");
+      }
+
+      long userIdValue = Long.parseLong(userId);
+      if (userIdValue <= 0) {
+        throw new IllegalArgumentException("userId must be a positive number");
+      }
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("id and userId must be valid numeric values", e);
+    }
   }
 
 }

@@ -17,6 +17,10 @@
             <groupId>com.julian.razif.figaro</groupId>
             <artifactId>app-config-data</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.julian.razif.figaro</groupId>
+            <artifactId>kafka-consumer-config</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.julian.razif.figaro</groupId>
@@ -30,6 +34,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
         </dependency>
     </dependencies>
 

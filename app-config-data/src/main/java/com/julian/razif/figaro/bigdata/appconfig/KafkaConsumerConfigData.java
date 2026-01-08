@@ -3,6 +3,44 @@ package com.julian.razif.figaro.bigdata.appconfig;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
+/**
+ * Configuration properties for Kafka consumer settings.
+ * <p>
+ * This record encapsulates all necessary configuration parameters for establishing
+ * and managing Kafka consumer connections. Properties are bound from the configuration
+ * file using the prefix {@code kafka-consumer-config}.
+ * </p>
+ * <p>
+ * Default values are provided for all parameters to ensure the application can run
+ * with minimal configuration. Override these values in your application properties
+ * or YAML files as needed.
+ * </p>
+ *
+ * @param bootstrapServers                  comma-separated list of Kafka broker addresses
+ * @param clientId                          unique identifier for this Kafka client
+ * @param groupId                           consumer group identifier for coordinated consumption
+ * @param keyDeserializer                   fully qualified class name of the key deserializer
+ * @param valueDeserializer                 fully qualified class name of the value deserializer
+ * @param enableAutoCommit                  whether to automatically commit offsets
+ * @param autoOffsetReset                   strategy for resetting offsets when no initial offset exists (earliest,
+ *                                          latest, none)
+ * @param batchListener                     whether to enable batch message processing
+ * @param autoStartup                       whether to automatically start the consumer on application startup
+ * @param concurrencyLevel                  number of concurrent consumer threads
+ * @param sessionTimeoutMs                  timeout in milliseconds for detecting consumer failures
+ * @param heartbeatIntervalMs               expected time in milliseconds between heartbeats to the consumer coordinator
+ * @param maxPollIntervalMs                 maximum delay in milliseconds between invocations of poll()
+ * @param maxPollRecords                    maximum number of records returned in a single poll() call
+ * @param maxPartitionFetchBytesDefault     maximum amount of data per partition the server will return
+ * @param maxPartitionFetchBytesBoostFactor multiplier for dynamically adjusting fetch size
+ * @param pollTimeoutMs                     timeout in milliseconds spent waiting in a poll if data is not available
+ * @param numOfPartitions                   number of partitions for topics created by this consumer
+ * @param replicationFactor                 replication factor for topics created by this consumer
+ * @param redisTempDataTopic                name of the Kafka topic for temporary Redis data
+ * @author Julian Razif Figaro
+ * @version 1.0
+ * @since 1.0
+ */
 @ConfigurationProperties(prefix = "kafka-consumer-config")
 public record KafkaConsumerConfigData(
   @DefaultValue("192.168.1.8:9092,192.168.1.9:9092,192.168.1.10:9092") String bootstrapServers,

@@ -1,0 +1,66 @@
+version: '3.2'
+services:
+  kafka-to-pv-dynamon-service:
+    image: 451726692073.dkr.ecr.ap-southeast-1.amazonaws.com/kafka-to-pv-dynamo-service:latest
+    build:
+      context: ./kafka-to-pv-dynamo-service
+      dockerfile: Dockerfile
+    environment:
+      JAVA_TOOL_OPTIONS: "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1HeapRegionSize=16m -XX:InitiatingHeapOccupancyPercent=45 -Xmx8g -Xms4g -XX:+UseStringDeduplication -XX:+OptimizeStringConcat # -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/heapdump.hprof -XX:+UseCompressedOops -XX:+UseCompressedClassPointers -XX:+AlwaysPreTouch -Djava.security.egd=file:/dev/./urandom Djdk.tracePinnedThreads=full"
+      SPRING_PROFILES_ACTIVE: prod
+      DYNAMO-CONFIG-DATA_DYNAMODB-ENDPOINT: dynamodb.ap-southeast-1.amazonaws.com
+      DYNAMO-CONFIG-DATA_AWS-REGION: ap-southeast-1
+      # AWS Credentials - SECURITY: Configure via Jenkins credentials or AWS IAM roles
+      # TODO: Remove these after configuring AWS IAM role for EC2 instances
+      # DYNAMO-CONFIG-DATA_AWS-ACCESSKEY should be provided via Jenkins credentials
+      # DYNAMO-CONFIG-DATA_AWS-SECRETKEY should be provided via Jenkins credentials
+      DYNAMO-CONFIG-DATA_TABLE-NAME-SESSION-PROVIDER-MEMBER: BigDataSession_ProviderMember_Prod
+      DYNAMO-CONFIG-DATA_ACT-SESSION-USER-PV: bigDataSesUsPvMember
+      DYNAMO-CONFIG-DATA_CONNECTION-TTL: 40000
+      DYNAMO-CONFIG-DATA_CONNECTION-TIMEOUT: 8000
+      DYNAMO-CONFIG-DATA_CLIENT-EXECUTION-TIMEOUT: 20000
+      DYNAMO-CONFIG-DATA_REQUEST-TIMEOUT: 4000
+      DYNAMO-CONFIG-DATA_SOCKET-TIMEOUT: 3600
+      DYNAMO-CONFIG-DATA_MAX-RETRY: 10
+      DYNAMO-CONFIG-DATA_THROTTLED-RETRIES: 'true'
+      DYNAMO-CONFIG-DATA_CONNECTION-MAX-IDLE-MILLIS: 2000
+      DYNAMO-CONFIG-DATA_MAX-CONNECTIONES: 1000
+      DYNAMO-CONFIG-DATA_TCP-KEEP-ALIVE: 'false'
+      KAFKA-CONSUMER-CONFIG_BOOTSTRAP-SERVERS: 10.8.3.184:9092,10.8.3.8:9092,10.8.4.90:9092
+      KAFKA-CONSUMER-CONFIG_CLIENT-ID: BO_JULIAN_STAGING_PV_02
+      KAFKA-CONSUMER-CONFIG_GROUP-ID: BO_02_JULIAN_STAGING_PV
+      KAFKA-CONSUMER-CONFIG_KEY-DESERIALIZER: org.apache.kafka.common.serialization.StringDeserializer
+      KAFKA-CONSUMER-CONFIG_VALUE-DESERIALIZER: org.apache.kafka.common.serialization.StringDeserializer
+      KAFKA-CONSUMER-CONFIG_ENABLE-AUTO-COMMIT: 'false'
+      KAFKA-CONSUMER-CONFIG_AUTO-OFFSET-RESET: latest
+      KAFKA-CONSUMER-CONFIG_BATCH-LISTENER: 'true'
+      KAFKA-CONSUMER-CONFIG_AUTO-STARTUP: 'true'
+      KAFKA-CONSUMER-CONFIG_CONCURRENCY-LEVEL: 3
+      KAFKA-CONSUMER-CONFIG_SESSION-TIMEOUT-MS: 10000
+      KAFKA-CONSUMER-CONFIG_HEARTBEAT-INTERVAL-MS: 3000
+      KAFKA-CONSUMER-CONFIG_MAX-POLL-INTERVAL-MS: 300000
+      KAFKA-CONSUMER-CONFIG_MAX-POLL-RECORDS: 500
+      KAFKA-CONSUMER-CONFIG_MAX-PARTITION-FETCH-BYTES-DEFAULT: 1048576
+      KAFKA-CONSUMER-CONFIG_MAX-PARTITION-FETCH-BYTES-BOOSTS-FACTOR: 1
+      KAFKA-CONSUMER-CONFIG_POLL-TIMEOUT-MS: 150
+      KAFKA-CONSUMER-CONFIG_FETCH-MIN-BYTES: 1024
+      KAFKA-CONSUMER-CONFIG_FETCH-MAX-WAIT-MS: 500
+      KAFKA-CONSUMER-CONFIG_CONNECTIONS-MAX-IDLE-MS: 540000
+      KAFKA-CONSUMER-CONFIG_REQUEST-TIMEOUT-MS: 30000
+      KAFKA-CONSUMER-CONFIG_COMPRESSION-TYPE: lz4
+      KAFKA-CONSUMER-CONFIG_NUM-OF-PARTITIONS: 3
+      KAFKA-CONSUMER-CONFIG_REPLICATION-FACTOR: 3
+      KAFKA-CONSUMER-CONFIG_REDIS-TEMP-DATA-TOPIC: RedisTempBigDataSession
+      SERVER_PORT: 8087
+    networks:
+      - bigdata-lan
+    deploy:
+      replicas: 4
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "8087:8087"
+
+networks:
+  bigdata-lan:
+    external: true

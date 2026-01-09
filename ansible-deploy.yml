@@ -1,0 +1,153 @@
+---
+- name: Deploy BigData Kafka to DynamoDB Service
+  gather_facts: true
+  hosts: production
+  become: yes
+  serial: 1  # Deploy one host at a time for safer rolling deployment
+  
+  vars:
+    service_name: "bigdata_kafka-to-pv-dynamon-service"
+    health_check_url: "http://localhost:8087/actuator/health"
+    health_check_retries: 10
+    health_check_delay: 10
+    stack_name: bigdata
+    compose_file: ~/swarm-stack-bigdata.yml
+    
+  tasks:
+    - name: Display deployment information
+      debug:
+        msg: "Deploying {{ stack_name }} stack to {{ inventory_hostname }} with image tag {{ image_tag | default('latest') }}"
+    
+    - name: ECR login to Docker
+      shell: |
+        aws ecr get-login-password --region ap-southeast-1 | \
+        docker login --username AWS --password-stdin 451726692073.dkr.ecr.ap-southeast-1.amazonaws.com
+      register: ecr_login
+      changed_when: "'Login Succeeded' in ecr_login.stdout"
+      
+    - name: Verify ECR login success
+      fail:
+        msg: "Failed to login to AWS ECR"
+      when: ecr_login.rc != 0
+
+    - name: Copy Docker Compose stack file
+      template:
+        src: ./Docker-compose.yml
+        dest: "{{ compose_file }}"
+        mode: 0644
+        owner: "{{ deployment_user | default('ubuntu') }}"
+        group: "{{ deployment_user | default('ubuntu') }}"
+      register: stack_file
+      tags: stack
+      
+    - name: Backup current stack configuration
+      shell: |
+        if [ -f {{ compose_file }}.backup ]; then
+          mv {{ compose_file }}.backup {{ compose_file }}.backup.old
+        fi
+        cp {{ compose_file }} {{ compose_file }}.backup
+      when: stack_file.changed
+      ignore_errors: yes
+
+    - name: Check if stack exists
+      shell: docker stack ls | grep -w {{ stack_name }} || true
+      register: stack_exists
+      changed_when: false
+      
+    - name: Get current service status before removal
+      shell: docker service ls --filter name={{ stack_name }} --format "{{ '{{' }}.Name{{ '}}' }} {{ '{{' }}.Replicas{{ '}}' }}"
+      register: service_status_before
+      when: stack_exists.stdout != ""
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Remove existing stack
+      shell: docker stack rm {{ stack_name }}
+      when: stack_exists.stdout != ""
+      register: stack_removed
+      
+    - name: Wait for stack removal to complete
+      shell: docker service ls --filter name={{ stack_name }} | grep {{ stack_name }} || true
+      register: stack_check
+      retries: 30
+      delay: 2
+      until: stack_check.stdout == ""
+      when: stack_removed is changed
+      
+    - name: Wait for network cleanup
+      pause:
+        seconds: 5
+      when: stack_removed is changed
+
+    - name: Deploy new stack
+      shell: |
+        docker stack deploy -c {{ compose_file }} {{ stack_name }} --with-registry-auth
+      register: stack_deploy
+      changed_when: "'Creating service' in stack_deploy.stdout or 'Updating service' in stack_deploy.stdout"
+      
+    - name: Wait for services to start
+      pause:
+        seconds: 30
+        
+    - name: Verify service deployment
+      shell: docker service ls --filter name={{ stack_name }} --format "{{ '{{' }}.Name{{ '}}' }} {{ '{{' }}.Replicas{{ '}}' }}"
+      register: service_status
+      retries: 20
+      delay: 10
+      until: service_status.stdout is search("4/4")
+      failed_when: false
+      
+    - name: Display service status
+      debug:
+        msg: "{{ service_status.stdout_lines }}"
+        
+    - name: Check if service is running
+      fail:
+        msg: "Service deployment failed - not all replicas are running"
+      when: 
+        - service_status.stdout is defined
+        - service_status.stdout is not search("4/4")
+        
+    - name: Perform health check on deployed service
+      uri:
+        url: "{{ health_check_url }}"
+        method: GET
+        status_code: 200
+        timeout: 10
+      register: health_check
+      retries: "{{ health_check_retries }}"
+      delay: "{{ health_check_delay }}"
+      until: health_check.status == 200
+      ignore_errors: yes
+      
+    - name: Display health check result
+      debug:
+        msg: "Health check {{ 'PASSED' if health_check.status == 200 else 'FAILED' }}"
+        
+    - name: Rollback on health check failure
+      block:
+        - name: Remove failed deployment
+          shell: docker stack rm {{ stack_name }}
+          
+        - name: Wait for failed stack removal
+          pause:
+            seconds: 10
+            
+        - name: Restore previous configuration
+          shell: |
+            if [ -f {{ compose_file }}.backup ]; then
+              cp {{ compose_file }}.backup {{ compose_file }}
+              docker stack deploy -c {{ compose_file }} {{ stack_name }} --with-registry-auth
+            fi
+          
+        - name: Fail deployment
+          fail:
+            msg: "Deployment failed health check and has been rolled back"
+      when: 
+        - health_check.failed is defined
+        - health_check.failed
+        
+  handlers:
+    - name: Notify deployment success
+      debug:
+        msg: "✅ Deployment completed successfully on {{ inventory_hostname }}"

@@ -30,3 +30,35 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Ansible and Deployment ###
+#inventori.ini
+*.pem
+*.key
+.ansible/
+*.retry
+
+### Sensitive Configuration ###
+*credentials*
+*secrets*
+*.env
+.env.*
+!.env.example
+
+### Docker ###
+docker-compose.override.yml
+.dockerignore
+
+### AWS ###
+.aws/
+aws-credentials.json
+
+### Logs ###
+*.log
+logs/
+*.hprof
+
+### Backup Files ###
+*.backup
+*.backup.*
+*.old

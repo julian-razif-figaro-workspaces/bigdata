@@ -232,7 +232,7 @@ Security headers are automatically configured via `SecurityConfig`:
 
 ## 🚀 JVM Tuning
 
-This service supports advanced JVM tuning for production workloads. See [JVM_OPTIONS.md](JVM_OPTIONS.md) for comprehensive documentation.
+This service supports advanced JVM tuning for production workloads. See [JVM_OPTIONS.md](docs/JVM_OPTIONS.md) for comprehensive documentation.
 
 ### Quick Start: Production JVM Options
 
@@ -262,7 +262,7 @@ Monitor virtual thread pinning in production:
 | **Startup Time** | Baseline | -30-50% | Lazy initialization |
 | **Throughput** | 1K msg/sec | 5-10K msg/sec | 5-10x with batching |
 
-See [JVM_OPTIONS.md](JVM_OPTIONS.md) for:
+See [JVM_OPTIONS.md](docs/JVM_OPTIONS.md) for:
 - Complete GC configuration options
 - Docker/Kubernetes deployment examples
 - Heap sizing guidelines
@@ -410,13 +410,13 @@ This project maintains high code quality standards with comprehensive reviews an
 
 ### Code Reviews
 
-- ✅ **Security Review:** See [SECURITY_REVIEW.md](SECURITY_REVIEW.md)
+- ✅ **Security Review:** See [SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md)
   - OWASP Top 10 compliance analysis
   - Security best practices verification
   - Vulnerability assessment
   - Rating: **8.5/10 (GOOD)**
 
-- ✅ **Code Quality Review:** See [CODE_QUALITY_REPORT.md](CODE_QUALITY_REPORT.md)
+- ✅ **Code Quality Review:** See [CODE_QUALITY_REPORT.md](docs/CODE_QUALITY_REPORT.md)
   - Architecture & design patterns analysis
   - Java 25 & Spring Boot 4 best practices
   - Performance optimization review
@@ -533,10 +533,10 @@ logging:
 
 This project maintains high standards through comprehensive code reviews. See the following reports for detailed analysis:
 
-- 📊 **[CODE_REVIEW_SUMMARY.md](CODE_REVIEW_SUMMARY.md)** - Overall review summary and scores
-- 🔒 **[SECURITY_REVIEW.md](SECURITY_REVIEW.md)** - OWASP Top 10 compliance and security analysis
-- ✨ **[CODE_QUALITY_REPORT.md](CODE_QUALITY_REPORT.md)** - Detailed code quality and best practices review
-- 🎯 **[RECOMMENDED_IMPROVEMENTS.md](RECOMMENDED_IMPROVEMENTS.md)** - Actionable improvement recommendations
+- 📊 **[CODE_REVIEW_SUMMARY.md](docs/CODE_REVIEW_SUMMARY.md)** - Overall review summary and scores
+- 🔒 **[SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md)** - OWASP Top 10 compliance and security analysis
+- ✨ **[CODE_QUALITY_REPORT.md](docs/CODE_QUALITY_REPORT.md)** - Detailed code quality and best practices review
+- 🎯 **[RECOMMENDED_IMPROVEMENTS.md](docs/RECOMMENDED_IMPROVEMENTS.md)** - Actionable improvement recommendations
 
 **Latest Review:** January 9, 2026 - **Overall Score: 8.9/10 (EXCELLENT)** ✅
 

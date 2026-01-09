@@ -37,7 +37,7 @@ All **6 major performance optimizations** have been successfully implemented and
 
 ### 2. Reactive Flow Backpressure
 **Files Modified:**
-- [KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
+- [KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
 
 **Changes:**
 - Added `onBackpressureBuffer(1000)` with overflow drop strategy
@@ -50,8 +50,8 @@ All **6 major performance optimizations** have been successfully implemented and
 
 ### 3. Comprehensive Metrics
 **Files Modified:**
-- [KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
-- [DynamoDBBatchService.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java) (NEW)
+- [KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
+- [DynamoDBBatchService.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java) (NEW)
 
 **Metrics Added:**
 ```
@@ -76,9 +76,9 @@ Timers (3):
 
 ### 4. Kafka Configuration Tuning
 **Files Modified:**
-- [application-dev.yaml](kafka-to-pv-dynamo-service/src/main/resources/application-dev.yaml)
-- [KafkaConsumerConfigData.java](app-config-data/src/main/java/com/julian/razif/figaro/bigdata/appconfig/KafkaConsumerConfigData.java)
-- [KafkaConsumerConfig.java](kafka-consumer-config/src/main/java/com/julian/razif/figaro/bigdata/consumer/config/KafkaConsumerConfig.java)
+- [application-dev.yaml](../kafka-to-pv-dynamo-service/src/main/resources/application-dev.yaml)
+- [KafkaConsumerConfigData.java](../app-config-data/src/main/java/com/julian/razif/figaro/bigdata/appconfig/KafkaConsumerConfigData.java)
+- [KafkaConsumerConfig.java](../kafka-consumer-config/src/main/java/com/julian/razif/figaro/bigdata/consumer/config/KafkaConsumerConfig.java)
 
 **New Settings:**
 ```yaml
@@ -95,7 +95,7 @@ compression-type: lz4
 
 ### 5. Batch DynamoDB Writes ⭐ HIGHEST IMPACT
 **Files Created:**
-- [DynamoDBBatchService.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java) ✨ NEW
+- [DynamoDBBatchService.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java) ✨ NEW
 
 **Features:**
 - Up to 25 items per batch (DynamoDB limit)
@@ -118,7 +118,7 @@ Improvement:         5-10x throughput, 96% fewer network calls
 
 ### 6. JSON Parsing Optimization
 **Files Modified:**
-- [KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
+- [KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
 
 **Changes:**
 - Moved size validation BEFORE JSON parsing
@@ -250,7 +250,7 @@ curl http://localhost:8080/actuator/metrics
 
 Refer to:
 1. [PERFORMANCE_OPTIMIZATION_REPORT.md](PERFORMANCE_OPTIMIZATION_REPORT.md) - Detailed technical report
-2. [.github/instructions/performance-optimization.instructions.md](.github/instructions/performance-optimization.instructions.md) - Performance guidelines
+2. [.github/instructions/performance-optimization.instructions.md](../.github/instructions/performance-optimization.instructions.md) - Performance guidelines
 3. Metrics dashboard after deployment
 
 ---

@@ -336,7 +336,7 @@ Kafka → Virtual Threads → DynamoDBBatchService (25 writes/request)
 
 ### Documentation
 - [JVM_OPTIONS.md](JVM_OPTIONS.md) - Complete production JVM guide
-- [README.md](README.md) - Updated project documentation
+- [README.md](../README.md) - Updated project documentation
 - [MIGRATION_TO_BATCH_SERVICE.md](MIGRATION_TO_BATCH_SERVICE.md) - Batch service migration
 - [PERFORMANCE_OPTIMIZATION_REPORT.md](PERFORMANCE_OPTIMIZATION_REPORT.md) - Object pooling optimization
 

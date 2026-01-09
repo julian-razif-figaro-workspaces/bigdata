@@ -24,7 +24,7 @@ This document outlines the completed migration from `DynamoDBService` (individua
 
 ### 2. KafkaToPvDynamoConsumer Refactoring
 
-**File:** [kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
+**File:** [kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
 
 **Changes:**
 - ✅ Replaced `DynamoDBService` dependency with `DynamoDBBatchService`
@@ -56,7 +56,7 @@ This document outlines the completed migration from `DynamoDBService` (individua
 
 ### 3. Test Updates
 
-**File:** [kafka-to-pv-dynamo-service/src/test/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumerTest.java](kafka-to-pv-dynamo-service/src/test/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumerTest.java)
+**File:** [kafka-to-pv-dynamo-service/src/test/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumerTest.java](../kafka-to-pv-dynamo-service/src/test/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumerTest.java)
 
 - ✅ Replaced `DynamoDBService` mock with `DynamoDBBatchService` mock
 - ✅ Updated mock behavior to return batch write count
@@ -226,11 +226,11 @@ If issues arise, rollback is simple:
 
 ### Modified Files
 1. [DynamoDBService.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBService.java) - Deprecated
-2. [KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java) - Migrated to batch service
-3. [KafkaToPvDynamoConsumerTest.java](kafka-to-pv-dynamo-service/src/test/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumerTest.java) - Updated mocks
+2. [KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java) - Migrated to batch service
+3. [KafkaToPvDynamoConsumerTest.java](../kafka-to-pv-dynamo-service/src/test/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumerTest.java) - Updated mocks
 
 ### Unchanged Files (Already Optimized)
-1. [DynamoDBBatchService.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java) - Production ready
+1. [DynamoDBBatchService.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java) - Production ready
 
 ### Documentation Files
 1. [PERFORMANCE_OPTIMIZATION_REPORT.md](PERFORMANCE_OPTIMIZATION_REPORT.md) - Performance analysis

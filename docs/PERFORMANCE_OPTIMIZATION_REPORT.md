@@ -50,7 +50,7 @@ This document summarizes the performance optimizations implemented in the Kafka-
 - Added error recovery with `onErrorResume` to prevent stream termination
 
 **Code Changes:**
-- [KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
+- [KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
   - Added backpressure buffer with overflow handling
   - Optimized flatMap parameters: concurrency=10, prefetch=1
   - Implemented graceful error handling
@@ -92,10 +92,10 @@ This document summarizes the performance optimizations implemented in the Kafka-
 | `dynamodb.batch.unprocessed.items` | Counter | Unprocessed items requiring retry |
 
 **Code Changes:**
-- [KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
+- [KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
   - Added MeterRegistry dependency injection
   - Instrumented receive(), filter(), and DynamoDB write paths
-- [DynamoDBBatchService.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java)
+- [DynamoDBBatchService.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java)
   - Added batch operation metrics
 
 **Expected Impact:**
@@ -121,7 +121,7 @@ This document summarizes the performance optimizations implemented in the Kafka-
 - Enabled LZ4 compression for network optimization
 
 **Configuration Changes:**
-- [application-dev.yaml](kafka-to-pv-dynamo-service/src/main/resources/application-dev.yaml)
+- [application-dev.yaml](../kafka-to-pv-dynamo-service/src/main/resources/application-dev.yaml)
   ```yaml
   fetch-min-bytes: 1024          # Min bytes to fetch (improved batching)
   fetch-max-wait-ms: 500         # Max wait time (reduced latency)
@@ -130,11 +130,11 @@ This document summarizes the performance optimizations implemented in the Kafka-
   compression-type: lz4          # Network optimization
   ```
 
-- [KafkaConsumerConfigData.java](app-config-data/src/main/java/com/julian/razif/figaro/bigdata/appconfig/KafkaConsumerConfigData.java)
+- [KafkaConsumerConfigData.java](../app-config-data/src/main/java/com/julian/razif/figaro/bigdata/appconfig/KafkaConsumerConfigData.java)
   - Added 5 new configuration parameters
   - Updated JavaDoc with performance implications
 
-- [KafkaConsumerConfig.java](kafka-consumer-config/src/main/java/com/julian/razif/figaro/bigdata/consumer/config/KafkaConsumerConfig.java)
+- [KafkaConsumerConfig.java](../kafka-consumer-config/src/main/java/com/julian/razif/figaro/bigdata/consumer/config/KafkaConsumerConfig.java)
   - Applied new configurations to ConsumerConfig
 
 **Expected Impact:**
@@ -161,7 +161,7 @@ This document summarizes the performance optimizations implemented in the Kafka-
 - Automatic retry for unprocessed items
 
 **New Service:**
-- [DynamoDBBatchService.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java)
+- [DynamoDBBatchService.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/service/DynamoDBBatchService.java)
   - `batchWriteSessionsAsync()`: Main batch write method
   - Supports up to 25 items per request (DynamoDB limit)
   - Automatic partitioning for larger batches
@@ -199,7 +199,7 @@ This document summarizes the performance optimizations implemented in the Kafka-
 - Added inline comments explaining security and performance benefits
 
 **Code Changes:**
-- [KafkaToPvDynamoConsumer.java](kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
+- [KafkaToPvDynamoConsumer.java](../kafka-to-pv-dynamo-service/src/main/java/com/julian/razif/figaro/bigdata/consumer/KafkaToPvDynamoConsumer.java)
   - Reordered validation: null check → size check → parsing
   - Added detailed comments on optimization rationale
 
@@ -396,7 +396,7 @@ public void benchmarkDynamoDBBatchWrite() {
 
 ## References
 
-- [Performance Optimization Instructions](.github/instructions/performance-optimization.instructions.md)
+- [Performance Optimization Instructions](../.github/instructions/performance-optimization.instructions.md)
 - [AWS DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
 - [Kafka Performance Tuning](https://kafka.apache.org/documentation/#producerconfigs)
 - [Spring Boot Performance](https://spring.io/blog/2023/10/16/runtime-efficiency-with-spring)

@@ -1,6 +1,6 @@
 package com.julian.razif.figaro.bigdata.dynamodb.config;
 
-import com.julian.razif.figaro.bigdata.appconfig.DynamonDBConfigData;
+import com.julian.razif.figaro.bigdata.appconfig.DynamoDBConfigData;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -25,7 +25,7 @@ import java.time.Duration;
  * <p>
  * This class provides the necessary configuration for connecting to DynamoDB,
  * including endpoint configuration, AWS region, credentials, and connection parameters.
- * The configuration is loaded from {@link DynamonDBConfigData}.
+ * The configuration is loaded from {@link DynamoDBConfigData}.
  * </p>
  * <p>
  * This configuration creates three types of DynamoDB clients:
@@ -47,13 +47,13 @@ import java.time.Duration;
  *
  * @author Julian Razif Figaro
  * @version 1.0
- * @see DynamonDBConfigData
+ * @see DynamoDBConfigData
  * @since 1.0
  */
 @Configuration
 public class DynamoDBConfig {
 
-  private final DynamonDBConfigData dynamoConfigData;
+  private final DynamoDBConfigData dynamoConfigData;
 
   /**
    * Constructs a new DynamoDBConfig with the specified configuration data.
@@ -61,7 +61,7 @@ public class DynamoDBConfig {
    * @param dynamoConfigData the DynamoDB configuration properties, must not be {@code null}
    */
   public DynamoDBConfig(
-    DynamonDBConfigData dynamoConfigData) {
+    DynamoDBConfigData dynamoConfigData) {
 
     this.dynamoConfigData = dynamoConfigData;
   }
@@ -134,7 +134,7 @@ public class DynamoDBConfig {
    * <strong>Retry Behavior:</strong>
    * <ul>
    * <li>Max attempts: Configured via
-   * {@link com.julian.razif.figaro.bigdata.appconfig.DynamonDBConfigData#maxRetry()}</li>
+   * {@link com.julian.razif.figaro.bigdata.appconfig.DynamoDBConfigData#maxRetry()}</li>
    * <li>Backoff: Exponential with jitter (prevents thundering herd)</li>
    * <li>Throttling: Automatically handles DynamoDB throttling with adaptive backoff</li>
    * <li>Transient errors: Retries on network errors, timeouts, and 5xx responses</li>
@@ -210,7 +210,7 @@ public class DynamoDBConfig {
    * <p>
    * <strong>Performance Notes:</strong>
    * <ul>
-   * <li>Connection pool size: {@link DynamonDBConfigData#maxConnections()}</li>
+   * <li>Connection pool size: {@link DynamoDBConfigData#maxConnections()}</li>
    * <li>Connection reuse: Configured with keep-alive and TTL</li>
    * <li>Timeout protection: Socket and connection timeouts prevent hanging requests</li>
    * </ul>

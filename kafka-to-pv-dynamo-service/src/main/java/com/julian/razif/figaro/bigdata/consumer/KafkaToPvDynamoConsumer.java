@@ -2,10 +2,11 @@ package com.julian.razif.figaro.bigdata.consumer;
 
 import com.google.gson.*;
 import com.julian.razif.figaro.bigdata.consumer.config.KafkaConsumer;
-import com.julian.razif.figaro.bigdata.consumer.service.DynamoDBService;
+import com.julian.razif.figaro.bigdata.consumer.service.DynamoDBBatchService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,7 +99,7 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
    */
   public static final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd HH:mm:ss").create();
 
-  private final DynamoDBService dynamoDBService;
+  private final DynamoDBBatchService dynamoDBBatchService;
 
   // Performance metrics
   private final Counter messagesReceivedCounter;
@@ -112,13 +113,14 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
   /**
    * Constructs a new Kafka to DynamoDB consumer.
    *
-   * @param dynamoDBService service for persisting data to DynamoDB
-   * @param meterRegistry   Micrometer registry for metrics collection
+   * @param dynamoDBBatchService batch service for persisting data to DynamoDB with improved performance
+   * @param meterRegistry        Micrometer registry for metrics collection
    */
   public KafkaToPvDynamoConsumer(
-    DynamoDBService dynamoDBService, MeterRegistry meterRegistry) {
+    DynamoDBBatchService dynamoDBBatchService,
+    MeterRegistry meterRegistry) {
 
-    this.dynamoDBService = dynamoDBService;
+    this.dynamoDBBatchService = dynamoDBBatchService;
 
     // Initialize performance metrics
     this.messagesReceivedCounter = Counter.builder("kafka.messages.received").description("Total number of messages received from Kafka").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
@@ -181,66 +183,30 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
 
     Flux
       .fromIterable(messages)
-      .onBackpressureBuffer(1000, message -> logger.warn("Backpressure buffer overflow, dropping message"))
-      .flatMap(message -> Mono
-          .fromFuture(filter(message))
-          .onErrorResume(error -> {
-            errorCount.incrementAndGet();
-            logger.error("Error filtering message", error);
-            return Mono.just(new JsonObject());
-          }), 10,  // Concurrency: process 10 messages in parallel
+      .onBackpressureBuffer(1000, _ -> logger.warn("Backpressure buffer overflow, dropping message"))
+      .flatMap(message -> consumeMessage(message, errorCount),
+        10,  // Concurrency: process 10 messages in parallel
         1    // Prefetch: fetch 1 at a time per parallel stream to reduce memory pressure
       )
-      .filter(json -> {
-        
-        boolean isValid = !json.isJsonNull() && json.has(FIELD_DATA);
-        if (!isValid) {
-          filteredCount.incrementAndGet();
+      .filter(json -> isValidJson(json, filteredCount))
+      .mapNotNull(json -> convertJsonToSessionData(json, errorCount))
+      .collectList()  // Collect all valid SessionData objects
+      .flatMap(sessionsList -> {
+        if (sessionsList.isEmpty()) {
+          logger.debug("No valid sessions to write to DynamoDB");
+          return Mono.just(0);
         }
-        return isValid;
-      })
-      .flatMap(json -> {
-        try {
-          JsonObject data = json.get(FIELD_DATA).getAsJsonObject();
-          long dateMillis = data.get(FIELD_DATE).getAsLong();
-          String dateString = DATE_FORMATTER.format(Instant.ofEpochMilli(dateMillis));
-          String sessionId = data.get(FIELD_ID).getAsString();
-          String userId = data.get(FIELD_USER_ID).getAsString();
-          String memberUsername = data.get(FIELD_MEMBER_USERNAME).getAsString();
 
-          logger.debug("Processing session: id={}, userId={}, username={}", sessionId, userId, memberUsername);
+        logger.info("Writing {} sessions to DynamoDB in batch", sessionsList.size());
 
-          return Mono
-            .fromFuture(() -> {
-              Timer.Sample sample = Timer.start();
-              return dynamoDBService.saveSessionAsync(dateString, sessionId, userId, memberUsername).whenComplete((_, error) -> {
-                sample.stop(dynamoDbWriteTimer);
-                if (error != null) {
-                  logger.error("DynamoDB write failed: id={}", sessionId, error);
-                }
-              });
-            })
-            .map(success -> {
-              if (Boolean.TRUE.equals(success)) {
-                processedCount.incrementAndGet();
-              } else {
-                errorCount.incrementAndGet();
-                logger.warn("Failed to save session: id={}", sessionId);
-              }
-              return success;
-            });
-        } catch (Exception e) {
-          errorCount.incrementAndGet();
-          logger.error("Error extracting session data from JSON", e);
-          return Mono.just(false);
-        }
+        Timer.Sample sample = Timer.start();
+        return performBatchSessionWrite(sessionsList, sample, errorCount, processedCount);
       })
       .doOnError(error -> {
-        errorCount.incrementAndGet();
         messagesErrorCounter.increment();
         logger.error("Error processing message batch", error);
       })
-      .doOnComplete(() -> {
+      .doFinally(_ -> {
         long duration = System.nanoTime() - startTime;
         messageProcessingTimer.record(duration, java.util.concurrent.TimeUnit.NANOSECONDS);
 
@@ -252,7 +218,89 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
           "Batch processing completed: processed={}, filtered={}, errors={}, total={}, duration={}ms", processedCount.get(), filteredCount.get(), errorCount.get(), messages.size(), duration / 1_000_000
         );
       })
-      .subscribeOn(Schedulers.boundedElastic()).subscribe();
+      .subscribeOn(Schedulers.boundedElastic())
+      .subscribe();
+  }
+
+  private @NonNull Mono<JsonObject> consumeMessage(
+    String message,
+    AtomicInteger errorCount) {
+
+    return Mono
+      .fromFuture(filter(message))
+      .onErrorResume(error -> {
+        errorCount.incrementAndGet();
+        logger.error("Error filtering message", error);
+        return Mono.just(new JsonObject());
+      });
+  }
+
+  private static boolean isValidJson(
+    JsonObject json,
+    AtomicInteger filteredCount) {
+
+    boolean isValid = !json.isJsonNull() && json.has(FIELD_DATA);
+    if (!isValid) {
+      filteredCount.incrementAndGet();
+    }
+
+    return isValid;
+  }
+
+  private static DynamoDBBatchService.@Nullable SessionData convertJsonToSessionData(
+    JsonObject json,
+    AtomicInteger errorCount) {
+
+    try {
+      JsonObject data = json.get(FIELD_DATA).getAsJsonObject();
+      long dateMillis = data.get(FIELD_DATE).getAsLong();
+      String dateString = DATE_FORMATTER.format(Instant.ofEpochMilli(dateMillis));
+      String sessionId = data.get(FIELD_ID).getAsString();
+      String userId = data.get(FIELD_USER_ID).getAsString();
+      String memberUsername = data.get(FIELD_MEMBER_USERNAME).getAsString();
+
+      logger.debug("Processing session: id={}, userId={}, username={}", sessionId, userId, memberUsername);
+
+      // Create a SessionData record for batch processing
+      return new DynamoDBBatchService.SessionData(dateString, sessionId, userId, memberUsername);
+    } catch (Exception e) {
+      errorCount.incrementAndGet();
+      logger.error("Error extracting session data from JSON", e);
+      return null;
+    }
+  }
+
+  private @NonNull Mono<Integer> performBatchSessionWrite(
+    List<DynamoDBBatchService.@Nullable SessionData> sessionsList,
+    Timer.Sample sample,
+    AtomicInteger errorCount,
+    AtomicInteger processedCount) {
+
+    return Mono
+      .fromFuture(() -> dynamoDBBatchService
+        .batchWriteSessionsAsync(sessionsList)
+        .whenComplete((count, error) -> {
+          sample.stop(dynamoDbWriteTimer);
+          if (error != null) {
+            logger.error("Batch DynamoDB write failed", error);
+            errorCount.addAndGet(sessionsList.size());
+          } else {
+            processedCount.set(count);
+            int failedCount = sessionsList.size() - count;
+            if (failedCount > 0) {
+              errorCount.addAndGet(failedCount);
+              logger.warn("Batch write partially failed: {}/{} items written", count, sessionsList.size());
+            } else {
+              logger.info("Successfully wrote {} sessions to DynamoDB", count);
+            }
+          }
+        })
+      )
+      .onErrorResume(error -> {
+        errorCount.addAndGet(sessionsList.size());
+        logger.error("Error during batch write operation", error);
+        return Mono.just(0);
+      });
   }
 
   /**
@@ -285,65 +333,56 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
 
     Timer.Sample sample = Timer.start();
 
-    return CompletableFuture
-      .supplyAsync(() -> {
+    return CompletableFuture.supplyAsync(() -> {
 
-        JsonObject x = getJsonObject(message);
-        if (x != null) {
-          sample.stop(jsonFilteringTimer);
-          return x;
+      JsonObject x = getJsonObject(message);
+      if (x != null) {
+        sample.stop(jsonFilteringTimer);
+        return x;
+      }
+
+      JsonObject objectMessage;
+      try {
+        objectMessage = gson.fromJson(message, JsonElement.class).getAsJsonObject();
+
+        // Validate JSON depth to prevent deeply nested attacks
+        if (getJsonDepth(objectMessage) > MAX_JSON_DEPTH) {
+          logger.warn("JSON depth exceeds maximum allowed depth {}, rejecting", MAX_JSON_DEPTH);
+          return new JsonObject();
         }
+      } catch (JsonSyntaxException ex) {
+        logger.debug("Invalid JSON syntax, skipping message", ex);
+        return new JsonObject();
+      }
 
-        JsonObject objectMessage;
-        try {
-          objectMessage = gson.fromJson(message, JsonElement.class).getAsJsonObject();
+      if (!objectMessage.isJsonNull() && objectMessage.has(FIELD_ACT) && Objects.equals(objectMessage.get(FIELD_ACT).getAsString(), ACTION_BIG_DATA_SESSION) && objectMessage.has(FIELD_DATA) && !objectMessage.get(FIELD_DATA).isJsonNull()) {
 
-          // Validate JSON depth to prevent deeply nested attacks
-          if (getJsonDepth(objectMessage) > MAX_JSON_DEPTH) {
-            logger.warn("JSON depth exceeds maximum allowed depth {}, rejecting", MAX_JSON_DEPTH);
-            return new JsonObject();
-          }
-        } catch (JsonSyntaxException ex) {
-          logger.debug("Invalid JSON syntax, skipping message", ex);
+        JsonObject data = objectMessage.get(FIELD_DATA).getAsJsonObject();
+
+        logger.debug("Received valid message from Kafka: action={}", ACTION_BIG_DATA_SESSION);
+
+        if (data.isJsonNull() || !data.has(FIELD_ID) || !data.has(FIELD_USER_ID) || !data.has(FIELD_MEMBER_USERNAME)) {
+
+          logger.debug("Message missing required fields, skipping");
           return new JsonObject();
         }
 
-        if (!objectMessage.isJsonNull() &&
-          objectMessage.has(FIELD_ACT) &&
-          Objects.equals(objectMessage.get(FIELD_ACT).getAsString(), ACTION_BIG_DATA_SESSION) &&
-          objectMessage.has(FIELD_DATA) &&
-          !objectMessage.get(FIELD_DATA).isJsonNull()) {
+        // Use thread-safe DateTimeFormatter instead of SimpleDateFormat
+        long currentDateMilliseconds = System.currentTimeMillis();
+        data.addProperty(FIELD_DATE, currentDateMilliseconds);
 
-          JsonObject data = objectMessage.get(FIELD_DATA).getAsJsonObject();
+        logger.debug("Filtered and validated message successfully");
 
-          logger.debug("Received valid message from Kafka: action={}", ACTION_BIG_DATA_SESSION);
-
-          if (data.isJsonNull() ||
-            !data.has(FIELD_ID) ||
-            !data.has(FIELD_USER_ID) ||
-            !data.has(FIELD_MEMBER_USERNAME)) {
-
-            logger.debug("Message missing required fields, skipping");
-            return new JsonObject();
-          }
-
-          // Use thread-safe DateTimeFormatter instead of SimpleDateFormat
-          long currentDateMilliseconds = System.currentTimeMillis();
-          data.addProperty(FIELD_DATE, currentDateMilliseconds);
-
-          logger.debug("Filtered and validated message successfully");
-
-          sample.stop(jsonFilteringTimer);
-          return objectMessage;
-        } else {
-          sample.stop(jsonFilteringTimer);
-          return new JsonObject();
-        }
-      });
+        sample.stop(jsonFilteringTimer);
+        return objectMessage;
+      } else {
+        sample.stop(jsonFilteringTimer);
+        return new JsonObject();
+      }
+    });
   }
 
-  @Nullable
-  private static JsonObject getJsonObject(
+  private static @Nullable JsonObject getJsonObject(
     String message) {
 
     // Validate a message exists first (the fastest check)

@@ -1,6 +1,6 @@
 package com.julian.razif.figaro.bigdata.consumer.service;
 
-import com.julian.razif.figaro.bigdata.appconfig.DynamonDBConfigData;
+import com.julian.razif.figaro.bigdata.appconfig.DynamoDBConfigData;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -67,7 +67,7 @@ public class DynamoDBBatchService {
   private static final String TAG_ACTION = "dynamodb-batch";
 
   private final DynamoDbAsyncClient dynamoDbAsyncClient;
-  private final DynamonDBConfigData configData;
+  private final DynamoDBConfigData configData;
 
   // Performance metrics
   private final Counter batchWriteCounter;
@@ -84,7 +84,7 @@ public class DynamoDBBatchService {
    */
   public DynamoDBBatchService(
     DynamoDbAsyncClient dynamoDbAsyncClient,
-    DynamonDBConfigData configData,
+    DynamoDBConfigData configData,
     MeterRegistry meterRegistry) {
 
     this.dynamoDbAsyncClient = dynamoDbAsyncClient;

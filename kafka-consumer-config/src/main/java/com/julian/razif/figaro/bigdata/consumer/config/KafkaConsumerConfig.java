@@ -50,7 +50,9 @@ public class KafkaConsumerConfig<K extends Serializable, V extends Serializable>
    *
    * @param kafkaConfigData configuration properties for Kafka consumer, must not be {@code null}
    */
-  public KafkaConsumerConfig(KafkaConsumerConfigData kafkaConfigData) {
+  public KafkaConsumerConfig(
+    KafkaConsumerConfigData kafkaConfigData) {
+
     this.kafkaConfigData = kafkaConfigData;
   }
 
@@ -85,6 +87,13 @@ public class KafkaConsumerConfig<K extends Serializable, V extends Serializable>
     props.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, kafkaConfigData.maxPollIntervalMs());
     props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, kafkaConfigData.maxPartitionFetchBytesDefault() * kafkaConfigData.maxPartitionFetchBytesBoostFactor());
     props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, kafkaConfigData.maxPollRecords());
+
+    // Performance optimization settings
+    props.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, kafkaConfigData.fetchMinBytes());
+    props.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, kafkaConfigData.fetchMaxWaitMs());
+    props.put(ConsumerConfig.CONNECTIONS_MAX_IDLE_MS_CONFIG, kafkaConfigData.connectionsMaxIdleMs());
+    props.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, kafkaConfigData.requestTimeoutMs());
+
     return props;
   }
 

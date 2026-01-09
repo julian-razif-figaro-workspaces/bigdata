@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import reactor.core.scheduler.Scheduler;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -38,11 +39,15 @@ class KafkaToPvDynamoConsumerTest {
   @Mock
   private DynamoDBBatchService mockBatchService;
 
+  @Mock
+  private Scheduler mockVirtualThreadScheduler;
+
   private KafkaToPvDynamoConsumer consumer;
 
   @BeforeEach
   void setUp() {
-    consumer = new KafkaToPvDynamoConsumer(mockBatchService, new SimpleMeterRegistry());
+    // Create a consumer with mocked virtual thread scheduler for tests
+    consumer = new KafkaToPvDynamoConsumer(mockBatchService, mockVirtualThreadScheduler, new SimpleMeterRegistry());
     // Mock batch service to return a successful writing count (lenient since not all tests call it)
     org.mockito.Mockito.lenient().when(mockBatchService.batchWriteSessionsAsync(org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation -> CompletableFuture.completedFuture(invocation.getArgument(0, java.util.List.class).size()));
   }

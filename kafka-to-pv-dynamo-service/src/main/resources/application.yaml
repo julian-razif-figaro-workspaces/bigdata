@@ -5,6 +5,12 @@ spring:
     active: dev
     #active: ${SPRING_PROFILES_ACTIVE}
 
+  # Spring Boot 4 Lazy Initialization for faster startup (30-50% improvement)
+  # Beans are initialized on first use instead of application startup
+  # Trade-off: Configuration errors may only appear when bean is first accessed
+  main:
+    lazy-initialization: true
+
 # Management and Monitoring Configuration
 management:
   endpoints:

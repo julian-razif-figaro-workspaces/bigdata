@@ -18,8 +18,9 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  * @since 1.0
  */
 @SpringBootApplication(scanBasePackages = {
+  "com.julian.razif.figaro.bigdata.appconfig",
   "com.julian.razif.figaro.bigdata.consumer",
-  "com.julian.razif.figaro.bigdata.dynamodb.config",
+  "com.julian.razif.figaro.bigdata.dynamodb",
 })
 @ConfigurationPropertiesScan({"com.julian.razif.figaro.bigdata.appconfig"})
 public class KafkaToPvDynamoServiceApplication {

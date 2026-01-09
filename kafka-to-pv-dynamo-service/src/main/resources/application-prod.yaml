@@ -68,3 +68,41 @@ dynamo-config-data:
   connection-max-idle-millis: ${DYNAMO-CONFIG-DATA_CONNECTION-MAX-IDLE-MILLIS}
   max-connections: ${DYNAMO-CONFIG-DATA_MAX-CONNECTIONES}
   tcp-keep-alive: ${DYNAMO-CONFIG-DATA_TCP-KEEP-ALIVE}
+
+# JVM Configuration for Production
+# Apply these JVM options to the application startup command or container environment
+# 
+# Option 1: ZGC (Recommended for low-latency requirements)
+# -XX:+UseZGC
+# -XX:ZUncommitDelay=300
+# -XX:+ZGenerational
+# -Xmx8g
+# -Xms4g
+# -XX:+UseStringDeduplication
+# -XX:+OptimizeStringConcat
+# 
+# Option 2: G1GC (Recommended for balanced throughput/latency)
+# -XX:+UseG1GC
+# -XX:MaxGCPauseMillis=200
+# -XX:G1HeapRegionSize=16m
+# -XX:InitiatingHeapOccupancyPercent=45
+# -Xmx8g
+# -Xms4g
+# -XX:+UseStringDeduplication
+# -XX:+OptimizeStringConcat
+# 
+# Common JVM Options for Both GCs:
+# -XX:+HeapDumpOnOutOfMemoryError
+# -XX:HeapDumpPath=/var/log/heapdump.hprof
+# -XX:+UseCompressedOops
+# -XX:+UseCompressedClassPointers
+# -XX:+AlwaysPreTouch
+# -Djava.security.egd=file:/dev/./urandom
+# 
+# Virtual Threads Monitoring (Java 21+):
+# -Djdk.tracePinnedThreads=full
+# 
+# For Kubernetes/Docker deployment, add to container specification:
+# env:
+#   - name: JAVA_TOOL_OPTIONS
+#     value: "-XX:+UseZGC -XX:+ZGenerational -Xmx8g -Xms4g"

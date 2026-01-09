@@ -68,3 +68,12 @@ dynamo-config-data:
   connection-max-idle-millis: 1000
   max-connections: 2000
   tcp-keep-alive: false
+
+# Logging Configuration for Development
+logging:
+  level:
+    root: INFO
+    com.julian.razif.figaro: DEBUG  # Allow DEBUG in dev
+    org.springframework: INFO
+    org.apache.kafka: INFO
+    software.amazon.awssdk: INFO

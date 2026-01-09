@@ -1,7 +1,8 @@
 package com.julian.razif.figaro.bigdata.consumer;
 
 import com.google.gson.JsonObject;
-import com.julian.razif.figaro.bigdata.consumer.service.DynamoDBService;
+import com.julian.razif.figaro.bigdata.consumer.service.DynamoDBBatchService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,8 +14,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link KafkaToPvDynamoConsumer}.
@@ -37,14 +36,15 @@ import static org.mockito.Mockito.when;
 class KafkaToPvDynamoConsumerTest {
 
   @Mock
-  private DynamoDBService mockDynamoDBService;
+  private DynamoDBBatchService mockBatchService;
 
   private KafkaToPvDynamoConsumer consumer;
 
   @BeforeEach
   void setUp() {
-    consumer = new KafkaToPvDynamoConsumer(mockDynamoDBService);
-    when(mockDynamoDBService.saveSessionAsync(anyString(), anyString(), anyString(), anyString())).thenReturn(CompletableFuture.completedFuture(true));
+    consumer = new KafkaToPvDynamoConsumer(mockBatchService, new SimpleMeterRegistry());
+    // Mock batch service to return a successful writing count (lenient since not all tests call it)
+    org.mockito.Mockito.lenient().when(mockBatchService.batchWriteSessionsAsync(org.mockito.ArgumentMatchers.anyList())).thenAnswer(invocation -> CompletableFuture.completedFuture(invocation.getArgument(0, java.util.List.class).size()));
   }
 
   @Test

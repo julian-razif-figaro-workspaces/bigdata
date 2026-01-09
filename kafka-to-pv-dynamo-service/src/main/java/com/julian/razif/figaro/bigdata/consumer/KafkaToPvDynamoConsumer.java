@@ -344,72 +344,142 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
     Timer.Sample sample = Timer.start();
 
     return CompletableFuture.supplyAsync(() -> {
-
-      JsonObject x = getJsonObject(message);
-      if (x != null) {
-        sample.stop(jsonFilteringTimer);
-        return x;
+      // Fast-fail validations
+      if (!isValidMessageSize(message)) {
+        return emptyJson();
       }
 
-      JsonObject objectMessage;
-      try {
-        objectMessage = gson.fromJson(message, JsonElement.class).getAsJsonObject();
-
-        // Validate JSON depth to prevent deeply nested attacks
-        if (getJsonDepth(objectMessage) > MAX_JSON_DEPTH) {
-          logger.warn("JSON depth exceeds maximum allowed depth {}, rejecting", MAX_JSON_DEPTH);
-          return new JsonObject();
-        }
-      } catch (JsonSyntaxException ex) {
-        logger.debug("Invalid JSON syntax, skipping message", ex);
-        return new JsonObject();
+      JsonObject parsed = parseAndValidateJson(message);
+      if (parsed.isJsonNull()) {
+        return emptyJson();
       }
 
-      if (!objectMessage.isJsonNull() && objectMessage.has(FIELD_ACT) && Objects.equals(objectMessage.get(FIELD_ACT).getAsString(), ACTION_BIG_DATA_SESSION) && objectMessage.has(FIELD_DATA) && !objectMessage.get(FIELD_DATA).isJsonNull()) {
-
-        JsonObject data = objectMessage.get(FIELD_DATA).getAsJsonObject();
-
-        logger.debug("Received valid message from Kafka: action={}", ACTION_BIG_DATA_SESSION);
-
-        if (data.isJsonNull() || !data.has(FIELD_ID) || !data.has(FIELD_USER_ID) || !data.has(FIELD_MEMBER_USERNAME)) {
-
-          logger.debug("Message missing required fields, skipping");
-          return new JsonObject();
-        }
-
-        // Use thread-safe DateTimeFormatter instead of SimpleDateFormat
-        long currentDateMilliseconds = System.currentTimeMillis();
-        data.addProperty(FIELD_DATE, currentDateMilliseconds);
-
-        logger.debug("Filtered and validated message successfully");
-
-        sample.stop(jsonFilteringTimer);
-        return objectMessage;
-      } else {
-        sample.stop(jsonFilteringTimer);
-        return new JsonObject();
+      if (!isValidMessageStructure(parsed)) {
+        return emptyJson();
       }
+
+      return enrichWithTimestamp(parsed, sample);
     });
   }
 
-  private static @Nullable JsonObject getJsonObject(
-    String message) {
-
-    // Validate a message exists first (the fastest check)
+  /**
+   * Validates message size constraints.
+   *
+   * @param message raw message string
+   * @return true if size is within limits
+   */
+  private boolean isValidMessageSize(String message) {
     if (message == null || message.isEmpty()) {
       logger.debug("Received null or empty message, skipping");
-      return new JsonObject();
+      return false;
     }
 
-    // Validate message size BEFORE parsing to avoid expensive Gson parsing
-    // This prevents memory exhaustion attacks and improves performance
-    // by rejecting oversized messages immediately
     if (message.length() > MAX_JSON_SIZE) {
       logger.warn("Message size {} exceeds maximum allowed size {}, rejecting", message.length(), MAX_JSON_SIZE);
-      return new JsonObject();
+      return false;
     }
 
-    return null;
+    return true;
+  }
+
+  /**
+   * Parses and validates JSON syntax and structure.
+   *
+   * @param message raw JSON message
+   * @return parsed JsonObject or empty JsonObject if invalid
+   */
+  private JsonObject parseAndValidateJson(
+    String message) {
+
+    try {
+      JsonObject objectMessage = gson.fromJson(message, JsonElement.class).getAsJsonObject();
+
+      // Validate JSON depth to prevent deeply nested attacks
+      if (getJsonDepth(objectMessage) > MAX_JSON_DEPTH) {
+        logger.warn("JSON depth exceeds maximum allowed depth {}, rejecting", MAX_JSON_DEPTH);
+        return new JsonObject();
+      }
+
+      return objectMessage;
+    } catch (JsonSyntaxException ex) {
+      logger.debug("Invalid JSON syntax, skipping message", ex);
+      return new JsonObject();
+    }
+  }
+
+  /**
+   * Validates message structure and required fields.
+   *
+   * @param objectMessage parsed JSON object
+   * @return true if structure is valid
+   */
+  private boolean isValidMessageStructure(
+    JsonObject objectMessage) {
+
+    if (objectMessage.isJsonNull()) {
+      return false;
+    }
+
+    // Validate action type
+    if (!objectMessage.has(FIELD_ACT) ||
+      !Objects.equals(objectMessage.get(FIELD_ACT).getAsString(), ACTION_BIG_DATA_SESSION)) {
+
+      logger.debug("Invalid or missing action type");
+      return false;
+    }
+
+    // Validate data object
+    if (!objectMessage.has(FIELD_DATA) ||
+      objectMessage.get(FIELD_DATA).isJsonNull()) {
+
+      logger.debug("Missing or null data field");
+      return false;
+    }
+
+    JsonObject data = objectMessage.get(FIELD_DATA).getAsJsonObject();
+
+    // Validate required fields
+    if (data.isJsonNull() ||
+      !data.has(FIELD_ID) ||
+      !data.has(FIELD_USER_ID) ||
+      !data.has(FIELD_MEMBER_USERNAME)) {
+
+      logger.debug("Message missing required fields, skipping");
+      return false;
+    }
+
+    logger.debug("Received valid message from Kafka: action={}", ACTION_BIG_DATA_SESSION);
+    return true;
+  }
+
+  /**
+   * Enriches a message with a timestamp and returns.
+   *
+   * @param objectMessage valid parsed message
+   * @param sample        timer sample for metrics
+   * @return enriched JsonObject
+   */
+  private JsonObject enrichWithTimestamp(
+    JsonObject objectMessage,
+    Timer.Sample sample) {
+
+    JsonObject data = objectMessage.get(FIELD_DATA).getAsJsonObject();
+    long currentDateMilliseconds = System.currentTimeMillis();
+    data.addProperty(FIELD_DATE, currentDateMilliseconds);
+
+    logger.debug("Filtered and validated message successfully");
+    sample.stop(jsonFilteringTimer);
+
+    return objectMessage;
+  }
+
+  /**
+   * Returns empty JsonObject for filtered messages.
+   *
+   * @return empty JsonObject
+   */
+  private JsonObject emptyJson() {
+    return new JsonObject();
   }
 
   /**
@@ -425,7 +495,10 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
   private int getJsonDepth(
     JsonElement element) {
 
-    if (element == null || element.isJsonNull() || element.isJsonPrimitive()) {
+    if (element == null ||
+      element.isJsonNull() ||
+      element.isJsonPrimitive()) {
+
       return 1;
     }
 

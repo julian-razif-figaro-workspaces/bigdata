@@ -22,6 +22,18 @@ kafka-consumer-config:
   max-partition-fetch-bytes-default: 1048576
   max-partition-fetch-bytes-boost-factor: 1
   poll-timeout-ms: 150
+  
+  # Fetch optimization for throughput
+  fetch-min-bytes: 1024
+  fetch-max-wait-ms: 500
+  
+  # Connection pooling and management
+  connections-max-idle-ms: 540000
+  request-timeout-ms: 30000
+  
+  # Compression for network optimization
+  compression-type: lz4
+  
   num-of-partitions: 42
   replication-factor: 3
   redis-temp-data-topic: RedisTempBigDataSession

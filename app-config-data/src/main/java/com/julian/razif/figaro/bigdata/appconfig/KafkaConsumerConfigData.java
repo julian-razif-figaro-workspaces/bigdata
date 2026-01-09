@@ -34,6 +34,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxPartitionFetchBytesDefault     maximum amount of data per partition the server will return
  * @param maxPartitionFetchBytesBoostFactor multiplier for dynamically adjusting fetch size
  * @param pollTimeoutMs                     timeout in milliseconds spent waiting in a poll if data is not available
+ * @param fetchMinBytes                     minimum amount of data the server should return for a fetch request
+ * @param fetchMaxWaitMs                    maximum time the server will block before answering the fetch request
+ * @param connectionsMaxIdleMs              close idle connections after this many milliseconds
+ * @param requestTimeoutMs                  maximum time a client will await a response of a request
+ * @param compressionType                   compression codec for messages (none, gzip, snappy, lz4, zstd)
  * @param numOfPartitions                   number of partitions for topics created by this consumer
  * @param replicationFactor                 replication factor for topics created by this consumer
  * @param redisTempDataTopic                name of the Kafka topic for temporary Redis data
@@ -60,6 +65,11 @@ public record KafkaConsumerConfigData(
   @DefaultValue("1048576") Integer maxPartitionFetchBytesDefault,
   @DefaultValue("1") Integer maxPartitionFetchBytesBoostFactor,
   @DefaultValue("150") Long pollTimeoutMs,
+  @DefaultValue("1024") Integer fetchMinBytes,
+  @DefaultValue("500") Integer fetchMaxWaitMs,
+  @DefaultValue("540000") Integer connectionsMaxIdleMs,
+  @DefaultValue("30000") Integer requestTimeoutMs,
+  @DefaultValue("lz4") String compressionType,
   @DefaultValue("3") Integer numOfPartitions,
   @DefaultValue("3") Integer replicationFactor,
   @DefaultValue("RedisTempBigDataSession") String redisTempDataTopic) {

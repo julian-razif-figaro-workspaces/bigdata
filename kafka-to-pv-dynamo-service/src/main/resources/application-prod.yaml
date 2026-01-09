@@ -22,6 +22,18 @@ kafka-consumer-config:
   max-partition-fetch-bytes-default: ${KAFKA-CONSUMER-CONFIG_MAX-PARTITION-FETCH-BYTES-DEFAULT}
   max-partition-fetch-bytes-boost-factor: ${KAFKA-CONSUMER-CONFIG_MAX-PARTITION-FETCH-BYTES-BOOSTS-FACTOR}
   poll-timeout-ms: ${KAFKA-CONSUMER-CONFIG_POLL-TIMEOUT-MS}
+
+  # Fetch optimization for throughput
+  fetch-min-bytes: ${KAFKA-CONSUMER-CONFIG_FETCH-MIN-BYTES}
+  fetch-max-wait-ms: ${KAFKA-CONSUMER-CONFIG_FETCH-MAX-WAIT-MS}
+
+  # Connection pooling and management
+  connections-max-idle-ms: ${KAFKA-CONSUMER-CONFIG_CONNECTIONS-MAX-IDLE-MS}
+  request-timeout-ms: ${KAFKA-CONSUMER-CONFIG_REQUEST-TIMEOUT-MS}
+
+  # Compression for network optimization
+  compression-type: ${KAFKA-CONSUMER-CONFIG_COMPRESSION-TYPE}
+
   num-of-partitions: ${KAFKA-CONSUMER-CONFIG_NUM-OF-PARTITIONS}
   replication-factor: ${KAFKA-CONSUMER-CONFIG_REPLICATION-FACTOR}
   redis-temp-data-topic: ${KAFKA-CONSUMER-CONFIG_REDIS-TEMP-DATA-TOPIC}

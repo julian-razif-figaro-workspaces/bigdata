@@ -11,6 +11,8 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * Service for asynchronous DynamoDB operations.
@@ -38,6 +40,18 @@ public class DynamoDBService {
 
   private static final Logger logger = LoggerFactory.getLogger(DynamoDBService.class);
 
+  /**
+   * Initial capacity for an item map (4 attributes per session).
+   * Using load factor 0.75, capacity 6 prevents resizing.
+   */
+  private static final int ITEM_MAP_CAPACITY = 6;
+
+  /**
+   * Cache for PutItemRequest builders to reduce object allocation.
+   * Key is a table name, value is a request builder function.
+   */
+  private final Map<String, Function<Map<String, AttributeValue>, PutItemRequest>> requestBuilderCache;
+
   private final DynamoDbAsyncClient dynamoDbAsyncClient;
   private final DynamonDBConfigData configData;
 
@@ -53,6 +67,56 @@ public class DynamoDBService {
 
     this.dynamoDbAsyncClient = dynamoDbAsyncClient;
     this.configData = configData;
+
+    // Pre-build and cache request builders for each table
+    this.requestBuilderCache = new ConcurrentHashMap<>(4);
+    initializeRequestBuilderCache();
+  }
+
+  /**
+   * Pre-initializes the request builder cache for all tables.
+   * This reduces object allocation during hot path execution.
+   */
+  private void initializeRequestBuilderCache() {
+    // Session provider member table
+    requestBuilderCache.put(
+      configData.tableNameSessionProviderMember(),
+      item -> PutItemRequest
+        .builder()
+        .tableName(configData.tableNameSessionProviderMember())
+        .item(item)
+        .build()
+    );
+
+    // Session user table
+    requestBuilderCache.put(
+      configData.tableNameSessionUser(),
+      item -> PutItemRequest
+        .builder()
+        .tableName(configData.tableNameSessionUser())
+        .item(item)
+        .build()
+    );
+
+    // Persistence provider member table
+    requestBuilderCache.put(
+      configData.tableNamePersistenceProviderMember(),
+      item -> PutItemRequest
+        .builder()
+        .tableName(configData.tableNamePersistenceProviderMember())
+        .item(item)
+        .build()
+    );
+
+    // Persistence user table
+    requestBuilderCache.put(
+      configData.tableNamePersistenceUser(),
+      item -> PutItemRequest
+        .builder()
+        .tableName(configData.tableNamePersistenceUser())
+        .item(item)
+        .build()
+    );
   }
 
   /**
@@ -90,29 +154,44 @@ public class DynamoDBService {
     // Validate all inputs
     validateSessionParameters(date, id, userId, memberUsername);
 
-    Map<String, AttributeValue> item = new HashMap<>();
+    // Pre-size HashMap to avoid resizing (4 items, load factor 0.75 => capacity 6)
+    Map<String, AttributeValue> item = HashMap.newHashMap(ITEM_MAP_CAPACITY);
     item.put("date", AttributeValue.builder().s(date).build());
     item.put("id", AttributeValue.builder().n(id).build());
     item.put("user_id", AttributeValue.builder().n(userId).build());
     item.put("member_username", AttributeValue.builder().s(memberUsername).build());
 
-    PutItemRequest request = PutItemRequest.builder().tableName(configData.tableNameSessionProviderMember()).item(item).build();
+    // Use cached request builder to reduce object allocation
+    PutItemRequest request = requestBuilderCache
+      .getOrDefault(
+        configData
+          .tableNameSessionProviderMember(),
+        item1 -> PutItemRequest
+          .builder()
+          .tableName(configData.tableNameSessionProviderMember())
+          .item(item1)
+          .build()
+      )
+      .apply(item);
 
-    return dynamoDbAsyncClient.putItem(request).thenApply(response -> {
-      int statusCode = response.sdkHttpResponse().statusCode();
-      boolean isSuccessful = response.sdkHttpResponse().isSuccessful();
+    return dynamoDbAsyncClient
+      .putItem(request)
+      .thenApply(response -> {
+        int statusCode = response.sdkHttpResponse().statusCode();
+        boolean isSuccessful = response.sdkHttpResponse().isSuccessful();
 
-      if (isSuccessful) {
-        logger.info("Session saved successfully: id={}, userId={}, status={}", id, userId, statusCode);
-      } else {
-        logger.error("Session save returned non-success status: id={}, userId={}, status={}", id, userId, statusCode);
-      }
+        if (isSuccessful) {
+          logger.info("Session saved successfully: id={}, userId={}, status={}", id, userId, statusCode);
+        } else {
+          logger.error("Session save returned non-success status: id={}, userId={}, status={}", id, userId, statusCode);
+        }
 
-      return isSuccessful;
-    }).exceptionally(throwable -> {
-      logger.error("Failed to save session to DynamoDB: id={}, userId={}, username={}, error={}", id, userId, memberUsername, throwable.getMessage(), throwable);
-      return false;
-    });
+        return isSuccessful;
+      })
+      .exceptionally(throwable -> {
+        logger.error("Failed to save session to DynamoDB: id={}, userId={}, username={}, error={}", id, userId, memberUsername, throwable.getMessage(), throwable);
+        return false;
+      });
   }
 
   /**

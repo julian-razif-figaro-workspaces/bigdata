@@ -45,7 +45,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @since 1.0
  */
 @ConfigurationProperties(prefix = "dynamo-config-data")
-public record DynamonDBConfigData(
+public record DynamoDBConfigData(
   @DefaultValue("dynamodb.ap-southeast-1.amazonaws.com") String dynamodbEndpoint,
   @DefaultValue("ap-southeast-1") String awsRegion,
   @DefaultValue("") String awsAccesskey,

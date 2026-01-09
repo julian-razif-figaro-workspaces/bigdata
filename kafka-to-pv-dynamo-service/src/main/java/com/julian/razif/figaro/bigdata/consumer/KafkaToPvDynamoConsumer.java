@@ -3,6 +3,9 @@ package com.julian.razif.figaro.bigdata.consumer;
 import com.google.gson.*;
 import com.julian.razif.figaro.bigdata.consumer.config.KafkaConsumer;
 import com.julian.razif.figaro.bigdata.consumer.service.DynamoDBService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +85,9 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
   private static final String FIELD_MEMBER_USERNAME = "member_username";
   private static final String FIELD_DATE = "date";
 
+  private static final String TAG_SERVICE = "service";
+  private static final String TAG_ACTION = "kafka-to-pv-dynamo";
+
   /**
    * Thread-safe date formatter for date formatting.
    */
@@ -94,15 +100,40 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
 
   private final DynamoDBService dynamoDBService;
 
+  // Performance metrics
+  private final Counter messagesReceivedCounter;
+  private final Counter messagesProcessedCounter;
+  private final Counter messagesFilteredCounter;
+  private final Counter messagesErrorCounter;
+  private final Timer messageProcessingTimer;
+  private final Timer jsonFilteringTimer;
+  private final Timer dynamoDbWriteTimer;
+
   /**
    * Constructs a new Kafka to DynamoDB consumer.
    *
    * @param dynamoDBService service for persisting data to DynamoDB
+   * @param meterRegistry   Micrometer registry for metrics collection
    */
   public KafkaToPvDynamoConsumer(
-    DynamoDBService dynamoDBService) {
+    DynamoDBService dynamoDBService, MeterRegistry meterRegistry) {
 
     this.dynamoDBService = dynamoDBService;
+
+    // Initialize performance metrics
+    this.messagesReceivedCounter = Counter.builder("kafka.messages.received").description("Total number of messages received from Kafka").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
+
+    this.messagesProcessedCounter = Counter.builder("kafka.messages.processed").description("Total number of messages successfully processed").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
+
+    this.messagesFilteredCounter = Counter.builder("kafka.messages.filtered").description("Total number of messages filtered out").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
+
+    this.messagesErrorCounter = Counter.builder("kafka.messages.error").description("Total number of messages with processing errors").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
+
+    this.messageProcessingTimer = Timer.builder("kafka.message.processing.time").description("Time taken to process a message batch").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
+
+    this.jsonFilteringTimer = Timer.builder("kafka.json.filtering.time").description("Time taken to filter and validate JSON").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
+
+    this.dynamoDbWriteTimer = Timer.builder("dynamodb.write.time").description("Time taken to write to DynamoDB").tag(TAG_SERVICE, TAG_ACTION).register(meterRegistry);
   }
 
   /**
@@ -139,15 +170,35 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
   public void receive(
     @Payload List<String> messages) {
 
+    messagesReceivedCounter.increment(messages.size());
+
+    long startTime = System.nanoTime();
     AtomicInteger processedCount = new AtomicInteger(0);
     AtomicInteger errorCount = new AtomicInteger(0);
+    AtomicInteger filteredCount = new AtomicInteger(0);
 
     logger.info("Received batch of {} messages for processing", messages.size());
 
     Flux
       .fromIterable(messages)
-      .flatMap(message -> Mono.fromFuture(filter(message)), 10) // Process 10 messages concurrently
-      .filter(json -> !json.isJsonNull() && json.has(FIELD_DATA))
+      .onBackpressureBuffer(1000, message -> logger.warn("Backpressure buffer overflow, dropping message"))
+      .flatMap(message -> Mono
+          .fromFuture(filter(message))
+          .onErrorResume(error -> {
+            errorCount.incrementAndGet();
+            logger.error("Error filtering message", error);
+            return Mono.just(new JsonObject());
+          }), 10,  // Concurrency: process 10 messages in parallel
+        1    // Prefetch: fetch 1 at a time per parallel stream to reduce memory pressure
+      )
+      .filter(json -> {
+        
+        boolean isValid = !json.isJsonNull() && json.has(FIELD_DATA);
+        if (!isValid) {
+          filteredCount.incrementAndGet();
+        }
+        return isValid;
+      })
       .flatMap(json -> {
         try {
           JsonObject data = json.get(FIELD_DATA).getAsJsonObject();
@@ -160,7 +211,15 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
           logger.debug("Processing session: id={}, userId={}, username={}", sessionId, userId, memberUsername);
 
           return Mono
-            .fromFuture(dynamoDBService.saveSessionAsync(dateString, sessionId, userId, memberUsername))
+            .fromFuture(() -> {
+              Timer.Sample sample = Timer.start();
+              return dynamoDBService.saveSessionAsync(dateString, sessionId, userId, memberUsername).whenComplete((_, error) -> {
+                sample.stop(dynamoDbWriteTimer);
+                if (error != null) {
+                  logger.error("DynamoDB write failed: id={}", sessionId, error);
+                }
+              });
+            })
             .map(success -> {
               if (Boolean.TRUE.equals(success)) {
                 processedCount.incrementAndGet();
@@ -178,11 +237,22 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
       })
       .doOnError(error -> {
         errorCount.incrementAndGet();
+        messagesErrorCounter.increment();
         logger.error("Error processing message batch", error);
       })
-      .doOnComplete(() -> logger.info("Batch processing completed: processed={}, errors={}, total={}", processedCount.get(), errorCount.get(), messages.size()))
-      .subscribeOn(Schedulers.boundedElastic())
-      .subscribe();
+      .doOnComplete(() -> {
+        long duration = System.nanoTime() - startTime;
+        messageProcessingTimer.record(duration, java.util.concurrent.TimeUnit.NANOSECONDS);
+
+        messagesProcessedCounter.increment(processedCount.get());
+        messagesFilteredCounter.increment(filteredCount.get());
+        messagesErrorCounter.increment(errorCount.get());
+
+        logger.info(
+          "Batch processing completed: processed={}, filtered={}, errors={}, total={}, duration={}ms", processedCount.get(), filteredCount.get(), errorCount.get(), messages.size(), duration / 1_000_000
+        );
+      })
+      .subscribeOn(Schedulers.boundedElastic()).subscribe();
   }
 
   /**
@@ -213,11 +283,16 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
   public CompletableFuture<JsonObject> filter(
     String message) {
 
+    Timer.Sample sample = Timer.start();
+
     return CompletableFuture
       .supplyAsync(() -> {
 
         JsonObject x = getJsonObject(message);
-        if (x != null) return x;
+        if (x != null) {
+          sample.stop(jsonFilteringTimer);
+          return x;
+        }
 
         JsonObject objectMessage;
         try {
@@ -233,20 +308,20 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
           return new JsonObject();
         }
 
-        if (!objectMessage.isJsonNull()
-          && objectMessage.has(FIELD_ACT)
-          && Objects.equals(objectMessage.get(FIELD_ACT).getAsString(), ACTION_BIG_DATA_SESSION)
-          && objectMessage.has(FIELD_DATA)
-          && !objectMessage.get(FIELD_DATA).isJsonNull()) {
+        if (!objectMessage.isJsonNull() &&
+          objectMessage.has(FIELD_ACT) &&
+          Objects.equals(objectMessage.get(FIELD_ACT).getAsString(), ACTION_BIG_DATA_SESSION) &&
+          objectMessage.has(FIELD_DATA) &&
+          !objectMessage.get(FIELD_DATA).isJsonNull()) {
 
           JsonObject data = objectMessage.get(FIELD_DATA).getAsJsonObject();
 
           logger.debug("Received valid message from Kafka: action={}", ACTION_BIG_DATA_SESSION);
 
-          if (data.isJsonNull()
-            || !data.has(FIELD_ID)
-            || !data.has(FIELD_USER_ID)
-            || !data.has(FIELD_MEMBER_USERNAME)) {
+          if (data.isJsonNull() ||
+            !data.has(FIELD_ID) ||
+            !data.has(FIELD_USER_ID) ||
+            !data.has(FIELD_MEMBER_USERNAME)) {
 
             logger.debug("Message missing required fields, skipping");
             return new JsonObject();
@@ -258,8 +333,10 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
 
           logger.debug("Filtered and validated message successfully");
 
+          sample.stop(jsonFilteringTimer);
           return objectMessage;
         } else {
+          sample.stop(jsonFilteringTimer);
           return new JsonObject();
         }
       });
@@ -269,12 +346,15 @@ public class KafkaToPvDynamoConsumer implements KafkaConsumer<String> {
   private static JsonObject getJsonObject(
     String message) {
 
-    // Validate message size to prevent memory exhaustion attacks
+    // Validate a message exists first (the fastest check)
     if (message == null || message.isEmpty()) {
       logger.debug("Received null or empty message, skipping");
       return new JsonObject();
     }
 
+    // Validate message size BEFORE parsing to avoid expensive Gson parsing
+    // This prevents memory exhaustion attacks and improves performance
+    // by rejecting oversized messages immediately
     if (message.length() > MAX_JSON_SIZE) {
       logger.warn("Message size {} exceeds maximum allowed size {}, rejecting", message.length(), MAX_JSON_SIZE);
       return new JsonObject();
